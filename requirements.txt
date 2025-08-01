@@ -1,0 +1,4 @@
+streamlit
+bcrypt
+email-validator
+python-dotenv
