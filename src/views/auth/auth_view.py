@@ -15,6 +15,10 @@ RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 def auth_view():
     st.title("🔐 Authentication")
 
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
     tabs = st.tabs(["Login", "Register", "Reset Password"])
     tab_login, tab_register, tab_reset = tabs
 
@@ -111,16 +115,23 @@ def auth_view():
         reg_username = st.text_input("Username", key="reg_username")
         reg_password = st.text_input("Password", type="password", key="reg_password")
         reg_email = st.text_input("Email", key="reg_email")
-        reg_client_name = st.text_input("Client Name", key="reg_client")
+        first_name = st.text_input("First Name", key="reg_first_name")
+        last_name = st.text_input("Last Name", key="reg_last_name")
         reg_company = st.text_input("Company", key="reg_company")
+        tenants = cursor.execute("SELECT name, id FROM tenants").fetchall()
+        reg_tenant = st.selectbox("Select Tenant", options=[t[0] for t in tenants], key="reg_tenant")
+        reg_tenant_id = next((t[1] for t in tenants if t[0] == reg_tenant), None)
+
 
         if st.button("Register"):
             success, message = register_user(
                 username=reg_username,
                 password=reg_password,
                 email=reg_email,
-                client_name=reg_client_name,
-                company_name=reg_company
+                first_name=first_name,
+                last_name=last_name,
+                company=reg_company,
+                tenant_id=reg_tenant_id
             )
             if success:
                 st.success("✅ Registration successful. Please check your email to verify your account.")

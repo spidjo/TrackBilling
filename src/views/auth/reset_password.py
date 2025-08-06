@@ -9,7 +9,7 @@ import time
 def reset_password():
     st.title("🔐 Create a New Password")
 
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params
     token = query_params.get("token", [None])[0]
 
     if not token:
