@@ -151,7 +151,7 @@ def client_usage_dashboard():
 
     # --- Finalize invoice ---
     if st.button("💳 Bill Now"):
-        success, result = finalize_invoice_for_user(user["id"], user["tenant_id"])
+        success, result = finalize_invoice_for_user(user_id, user["tenant_id"])
         if success:
             st.success(f"✅ Invoice #{result} created successfully.")
             st.rerun()
