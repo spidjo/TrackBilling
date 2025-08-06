@@ -18,7 +18,7 @@ EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", EMAIL_USER)
 
 
-TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
+TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "..", "assets", "templates")
 
 env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
 

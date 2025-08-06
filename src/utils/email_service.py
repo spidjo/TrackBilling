@@ -16,9 +16,10 @@ SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 APP_URL = os.getenv("APP_URL", "http://localhost:8501")
 
+TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "..", "assets", "templates")
 # Setup Jinja2 template environment
 templates_env = Environment(
-    loader=FileSystemLoader("templates"),
+    loader=FileSystemLoader(TEMPLATES_DIR),
     autoescape=select_autoescape(["html", "xml"])
 )
 def send_verification_email(to_email, username, token):
