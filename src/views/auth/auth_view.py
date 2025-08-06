@@ -9,8 +9,8 @@ from db.database import get_db_connection
 from utils.login_attempts import is_rate_limited
 from streamlit_js_eval import streamlit_js_eval
 
-RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI")
-RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe")
+RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
 def auth_view():
     st.title("🔐 Authentication")
