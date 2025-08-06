@@ -86,7 +86,7 @@ def admin_dashboard():
         if pending_count > 0:
             sidebar_title += f" 🔴 ({pending_count})"
 
-        st.sidebar.title(sidebar_title)
+        # st.sidebar.title(sidebar_title)
 
     with invoices_tab:
         st.subheader("🧾 Invoice Status Overview")

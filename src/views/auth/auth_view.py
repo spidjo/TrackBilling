@@ -61,10 +61,10 @@ def auth_view():
                 st.error("🚫 Too many login attempts. Please try again later.")
                 return
 
-            token = token_from_js or captcha_token_manual
-            if not token or not validate_captcha(token):
-                st.error("❌ CAPTCHA validation failed. Please try again.")
-                return
+            # token = token_from_js or captcha_token_manual
+            # if not token or not validate_captcha(token):
+            #     st.error("❌ CAPTCHA validation failed. Please try again.")
+            #     return
 
             result, role, tenant_id = authenticate_user(username, password)
             st.session_state.login_attempted = True

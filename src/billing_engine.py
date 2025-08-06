@@ -362,9 +362,9 @@ def auto_generate_invoices():
 
         # Insert invoice
         cursor.execute("""
-            INSERT INTO invoices (user_id, tenant_id, plan_id, invoice_date, period_start, period_end, total_amount, is_paid)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-        """, (user_id, tenant_id, plan_id, today, start_period, end_period, estimated_total))
+            INSERT INTO invoices (user_id, tenant_id, invoice_date, period_start, period_end, total_amount, is_paid)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+        """, (user_id, tenant_id, today, start_period, end_period, estimated_total))
         invoice_id = cursor.lastrowid
 
         # Insert invoice items
