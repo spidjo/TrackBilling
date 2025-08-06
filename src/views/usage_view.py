@@ -1,7 +1,7 @@
 import streamlit as st
-from database import get_db_connection
+from db.database import get_db_connection
 from datetime import datetime
-from session import init_session_state
+from utils.session import init_session_state
 
 def log_usage():
     init_session_state()

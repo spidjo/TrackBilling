@@ -1,6 +1,6 @@
 # src/utils/anomaly_detection.py
 
-from database import get_db_connection
+from db.database import get_db_connection
 from datetime import datetime, timedelta
 
 def detect_anomalies(user_id, metric_type, threshold=2.0):

@@ -2,12 +2,13 @@
 import bcrypt
 import sqlite3
 import secrets
-import datetime
+import socket
+from datetime import datetime, timedelta
 from email_validator import validate_email, EmailNotValidError
 
-from database import get_db_connection
+from db.database import get_db_connection
 from config import settings
-from email_service import send_verification_email
+from utils.email_service import send_verification_email
 
 # Checks if a password meets strength requirements
 def is_strong_password(password: str) -> bool:
@@ -30,11 +31,18 @@ def register_user(username, password, first_name, last_name, company, email, ten
         return {"success": False, "error": "Weak password."}
 
     hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    reg_date = datetime.date.today().isoformat()
+    reg_date = datetime.utcnow().isoformat()
     token = secrets.token_urlsafe(32)
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    #get id from the tenants where name matches tenant_id
+    cursor.execute("SELECT id FROM tenants WHERE name = ?", (tenant_id,))
+    tenant = cursor.fetchone()
+    if not tenant:
+        return {"success": False, "error": "Invalid tenant."}
+    tenant_id = tenant[0]
 
     try:
         cursor.execute("""
@@ -42,7 +50,7 @@ def register_user(username, password, first_name, last_name, company, email, ten
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (username, hashed_pw, first_name, last_name, company, validated_email, reg_date, token, tenant_id))
         conn.commit()
-        send_verification_email(to_email=validated_email, token=token, first_name=first_name)
+        send_verification_email(to_email=validated_email, username=first_name, token=token)
 
         return {"success": True, "token": token}
     except sqlite3.IntegrityError as e:
@@ -85,3 +93,86 @@ def verify_token(token: str):
 
     conn.close()
     return result
+
+# Initializes session state for authentication
+def get_client_ip():
+    try:
+        return socket.gethostbyname(socket.gethostname())
+    except:
+        return "unknown"
+
+# Logs the attempt to resend verification email, including user ID, timestamp, IP address, status, and reason
+def log_resend_attempt(user_id, status, reason=""):
+    print(f"Logging resend attempt for user_id={user_id}, status={status}, reason={reason}")  # TEMP
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO verification_resend_log (user_id, timestamp, ip_address, status, reason)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        datetime.utcnow().isoformat(),
+        get_client_ip(),
+        status,
+        reason
+    ))
+    conn.commit()
+    conn.close()
+
+
+# Resends a verification email if user exists and is not verified
+def resend_verification_email(username):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, email, first_name, is_verified, last_verification_sent FROM users WHERE username = ?
+    """, (username,))
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+        return {"success": False, "error": "User not found."}
+
+    user_id, email, first_name, is_verified, last_sent = user
+
+    if is_verified:
+        log_resend_attempt(user_id, "blocked", "Already verified")
+        conn.close()
+        return {"success": False, "error": "User is already verified."}
+
+    # Enforce 1-hour resend limit
+    if last_sent:
+        try:
+            last_time = datetime.fromisoformat(last_sent)
+            if datetime.utcnow() - last_time < timedelta(hours=1):
+                remaining = timedelta(hours=1) - (datetime.utcnow() - last_time)
+                minutes = int(remaining.total_seconds() // 60)
+                log_resend_attempt(user_id, "blocked", f"Resend too soon. Wait {minutes} mins")
+                return {
+                    "success": False,
+                    "error": f"Please wait {minutes} more minutes before resending."
+                }
+        except Exception as e:
+            log_resend_attempt(user_id, "error", f"Timestamp parse failed: {str(e)}")
+            # fallback in case parsing fails
+            pass
+
+    token = secrets.token_urlsafe(32)
+    now_iso = datetime.utcnow().isoformat()
+
+    try:
+        cursor.execute("""
+            UPDATE users 
+            SET verification_token = ?, last_verification_sent = ? 
+            WHERE id = ?
+        """, (token, now_iso, user_id))
+        conn.commit()
+        send_verification_email(to_email=email, username=first_name, token=token)
+        log_resend_attempt(user_id, "sent", "Verification email sent")
+        conn.commit()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+

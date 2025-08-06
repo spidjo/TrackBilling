@@ -5,8 +5,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from io import BytesIO
 from datetime import datetime, timedelta
-from database import get_db_connection
-from session import init_session_state
+from db.database import get_db_connection
+from utils.session import init_session_state
 
 def usage_dashboard():
     init_session_state()

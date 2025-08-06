@@ -5,7 +5,7 @@
 # if the total payments meet or exceed the invoice amount.
 
 from datetime import datetime
-from database import get_db_connection
+from db.database import get_db_connection
 
 def record_payment(invoice_id, amount, method='manual', notes=None):
     """
@@ -17,7 +17,7 @@ def record_payment(invoice_id, amount, method='manual', notes=None):
 
     # Insert payment record into the payments table
     cursor.execute("""
-        INSERT INTO payments (invoice_id, amount_paid, method, notes)
+        INSERT INTO payments (invoice_id, amount, payment_method, notes)
         VALUES (?, ?, ?, ?)
     """, (invoice_id, amount, method, notes))
 
@@ -29,7 +29,7 @@ def record_payment(invoice_id, amount, method='manual', notes=None):
 
         # Calculate the total amount paid so far for this invoice
         cursor.execute("""
-            SELECT SUM(amount_paid) FROM payments WHERE invoice_id = ?
+            SELECT SUM(amount) FROM payments WHERE invoice_id = ?
         """, (invoice_id,))
         total_paid = cursor.fetchone()[0] or 0.0
 

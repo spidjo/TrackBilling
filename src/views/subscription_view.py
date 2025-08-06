@@ -1,6 +1,6 @@
 import streamlit as st
-from database import get_db_connection
-from session import init_session_state
+from db.database import get_db_connection
+from utils.session import init_session_state
 
 def manage_subscriptions():
     init_session_state()

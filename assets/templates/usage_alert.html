@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Usage Alert</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; background-color: white; padding: 20px; border-radius: 8px;">
+        <h2>Usage Alert</h2>
+        <p>Hi {{ username }},</p>
+        <p>You have used <strong>{{ percent_used }}%</strong> of your quota for <strong>{{ metric_name }}</strong>.</p>
+        <p>Details:</p>
+        <ul>
+            <li>Plan Limit: {{ plan_limit }}</li>
+            <li>Current Usage: {{ current_usage }}</li>
+        </ul>
+        <p>Consider upgrading your plan or monitoring usage more closely.</p>
+        <p>Thanks,<br>The {{ app_name }} Team</p>
+    </div>
+</body>
+</html>

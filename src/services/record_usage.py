@@ -1,5 +1,5 @@
 from datetime import datetime
-from database import get_db_connection
+from db.database import get_db_connection
 from utils.anomaly_detection import detect_anomalies
 from services.email_alerts import send_alert_email
 import logging

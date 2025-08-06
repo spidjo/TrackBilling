@@ -3,7 +3,7 @@
 import streamlit as st
 import sqlite3
 import uuid
-from database import get_db_connection
+from db.database import get_db_connection
 
 def manage_tenants():
     st.subheader("🔧 Manage Tenants")
