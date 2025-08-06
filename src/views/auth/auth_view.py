@@ -25,29 +25,29 @@ def auth_view():
         password = st.text_input("Password", type="password", key="login_password")
         st.markdown("[Forgot your password? Click here to reset.](?reset=1)")
 
-        # --- CAPTCHA Integration ---
-        st.markdown("""
-            <script src="https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit" async defer></script>
-            <div id="recaptcha-container"></div>
-            <script>
-                function onSubmit(token) {
-                    window.__last_recaptcha_token = token;
-                }
+        # # --- CAPTCHA Integration ---
+        # st.markdown("""
+        #     <script src="https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit" async defer></script>
+        #     <div id="recaptcha-container"></div>
+        #     <script>
+        #         function onSubmit(token) {
+        #             window.__last_recaptcha_token = token;
+        #         }
 
-                var onloadCallback = function() {
-                    grecaptcha.render('recaptcha-container', {  
-                        'sitekey' : '%s',
-                        'callback' : onSubmit
-                    });
-                };
-            </script>
-        """ % RECAPTCHA_SITE_KEY, unsafe_allow_html=True)
+        #         var onloadCallback = function() {
+        #             grecaptcha.render('recaptcha-container', {  
+        #                 'sitekey' : '%s',
+        #                 'callback' : onSubmit
+        #             });
+        #         };
+        #     </script>
+        # """ % RECAPTCHA_SITE_KEY, unsafe_allow_html=True)
 
-        # --- Evaluate the token from frontend
-        token_from_js = streamlit_js_eval(js_expressions="window.__last_recaptcha_token", key="captcha_eval")
+        # # --- Evaluate the token from frontend
+        # token_from_js = streamlit_js_eval(js_expressions="window.__last_recaptcha_token", key="captcha_eval")
 
-        # --- Fallback manual entry
-        captcha_token_manual = st.text_input("Captcha Token (Paste here if blocked)", key="captcha_token")
+        # # --- Fallback manual entry
+        # captcha_token_manual = st.text_input("Captcha Token (Paste here if blocked)", key="captcha_token")
 
         # --- Session defaults
         st.session_state.setdefault("login_attempted", False)
@@ -62,10 +62,10 @@ def auth_view():
                 st.error("🚫 Too many login attempts. Please try again later.")
                 return
 
-            token = token_from_js or captcha_token_manual
-            if not token or not validate_captcha(token):
-                st.error("❌ CAPTCHA validation failed. Please try again.")
-                return
+            # token = token_from_js or captcha_token_manual
+            # if not token or not validate_captcha(token):
+            #     st.error("❌ CAPTCHA validation failed. Please try again.")
+            #     return
 
             result, role, tenant_id = authenticate_user(username, password)
             st.session_state.login_attempted = True
