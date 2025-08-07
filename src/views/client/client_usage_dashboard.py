@@ -10,6 +10,14 @@ from billing_engine import estimate_invoice_for_user, finalize_invoice_for_user,
 from utils.pdf_utils import generate_invoice_pdf
 
 
+def get_user_id(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE username = ?", (user_id,))
+    user_row = cursor.fetchone()
+    conn.close()
+    return user_row[0] if user_row else None
+
 def client_usage_dashboard():
     st.set_page_config(page_title="Usage Dashboard", layout="wide")
     require_login("client")
@@ -30,7 +38,7 @@ def client_usage_dashboard():
     cursor.execute("""
         SELECT plan_id FROM subscriptions 
         WHERE user_id = ? AND is_active = 1
-    """, (user_id,))
+    """, (get_user_id(user_id),))
     row = cursor.fetchone()
     if not row:
         st.warning("No active subscription found.")
@@ -61,7 +69,7 @@ def client_usage_dashboard():
         WHERE user_id = ?
           AND strftime('%Y-%m', usage_date) = ?
         GROUP BY metric_name
-    """, (user_id, current_month))
+    """, (get_user_id(user_id), current_month))
     usage = dict(cursor.fetchall())
 
     # --- Display usage per metric ---
@@ -98,7 +106,7 @@ def client_usage_dashboard():
         LEFT JOIN payments p ON i.id = p.invoice_id
         WHERE i.user_id = ?
         ORDER BY i.period_start DESC
-    """, (user_id,))
+    """, (get_user_id(user_id),))
 
     rows = cursor.fetchall()
 
@@ -112,7 +120,7 @@ def client_usage_dashboard():
         st.info("No invoice or payment records found.")
 
     # --- Estimate invoice ---
-    items, estimated_total = estimate_invoice_for_user(user_id, tenant_id)
+    items, estimated_total = estimate_invoice_for_user(get_user_id(user_id), tenant_id)
 
     if not items:
         st.info("No invoice data available. Make sure you're subscribed and have usage records.")
@@ -151,7 +159,7 @@ def client_usage_dashboard():
 
     # --- Finalize invoice ---
     if st.button("💳 Bill Now"):
-        success, result = finalize_invoice_for_user(user_id, user["tenant_id"])
+        success, result = finalize_invoice_for_user(get_user_id(user_id), user["tenant_id"])
         if success:
             st.success(f"✅ Invoice #{result} created successfully.")
             st.rerun()

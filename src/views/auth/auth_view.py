@@ -19,8 +19,8 @@ def auth_view():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    tabs = st.tabs(["Login", "Register", "Reset Password"])
-    tab_login, tab_register, tab_reset = tabs
+    tabs = st.tabs(["Login", "Register"])
+    tab_login, tab_register = tabs
 
     # --- Login Tab ---
     with tab_login:
@@ -137,25 +137,3 @@ def auth_view():
                 st.success("✅ Registration successful. Please check your email to verify your account.")
             else:
                 st.error(f"❌ Registration failed: {message}")
-
-    # --- Reset Password Tab ---
-    with tab_reset:
-        st.subheader("Reset Password")
-        reset_email = st.text_input("Email Address", key="reset_email")
-
-        if st.button("Request Reset Link"):
-            success = request_password_reset(reset_email)
-            if success:
-                st.success("📨 Password reset link sent. Check your email.")
-            else:
-                st.error("❌ Unable to send reset email. Please check the email address.")
-
-        reset_token = st.text_input("Reset Token", key="reset_token")
-        new_password = st.text_input("New Password", type="password", key="new_password")
-
-        if st.button("Reset Password"):
-            success = reset_password(reset_token, new_password)
-            if success:
-                st.success("✅ Password successfully reset. You can now log in.")
-            else:
-                st.error("❌ Invalid or expired reset token.")

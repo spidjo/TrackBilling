@@ -6,8 +6,7 @@ import time
 import traceback
 
 from db.database import get_db_connection
-from utils.email_utils import send_email_with_attachment, email_billing_report_to_admin
-from utils.report_utils import generate_tenant_billing_report_pdf
+from utils.email_utils import email_billing_report_to_admin
 
 # --- Setup Logging ---
 logging.basicConfig(
@@ -15,6 +14,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
 
 def is_first_of_month():
     return datetime.today().day == 1

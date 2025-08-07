@@ -6,6 +6,7 @@ import smtplib
 from email.message import EmailMessage
 from db.database import get_db_connection
 from datetime import datetime
+from utils.email_utils import send_password_reset_email
 
 def reset_password_request():
     st.title("🔑 Reset Your Password")
@@ -29,19 +30,17 @@ def reset_password_request():
             """, (user_id, email_input, token))
             conn.commit()
 
+            # Get username fron users table
+            cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+            username = cursor.fetchone()[0]
+            
             reset_link = f"http://localhost:8501/reset_password?token={token}"
-            st.success("✅ Reset link sent to your email!")
+            
 
             # Send email (replace with real email sending)
             try:
-                msg = EmailMessage()
-                msg["Subject"] = "Your Password Reset Link"
-                msg["From"] = "no-reply@billing-saas.com"
-                msg["To"] = email_input
-                msg.set_content(f"Click below to reset your password:\n{reset_link}")
-
-                with smtplib.SMTP("localhost") as smtp:
-                    smtp.send_message(msg)
+                send_password_reset_email(to_email=email_input, username=username, token=token)
+                
             except Exception as e:
                 st.warning("⚠️ Email sending failed. Use the link below:")
                 st.code(reset_link)

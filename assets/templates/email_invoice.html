@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Your Invoice #{{ invoice_id }}</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+        <h2 style="color: #4CAF50;">Invoice #{{ invoice_id }}</h2>
+        <p>Dear {{ client_name or "Customer" }},</p>
+
+        <p>Attached is your invoice <strong>#{{ invoice_id }}</strong> dated <strong>{{ invoice_date }}</strong>.</p>
+
+        <table style="width: 100%; margin-top: 20px; margin-bottom: 20px;">
+            <tr>
+                <td style="font-weight: bold;">Amount Due:</td>
+                <td>R{{ "{:.2f}".format(invoice_amount) }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight: bold;">Status:</td>
+                <td style="color: {{ 'green' if is_paid else 'red' }};">
+                    {{ "Paid" if is_paid else "Unpaid" }}
+                </td>
+            </tr>
+        </table>
+
+        <p>Please see the attached invoice PDF for full details.</p>
+
+        <p>Regards,<br>
+        {{ tenant_name or "MzansiTel" }} Billing Team</p>
+    </div>
+</body>
+</html>

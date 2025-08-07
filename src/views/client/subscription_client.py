@@ -15,19 +15,25 @@ def subscription_client():
     if not user:
         st.stop()
 
-    user_id = st.session_state.username 
+    user_id = st.session_state.username
     st.title("📦 My Subscription Plan")
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # --- Get user ID from users table
+    cursor.execute("SELECT id FROM users WHERE username = ?", (user_id,))
+    user_row = cursor.fetchone()
+    
+    u_id = user_row[0] if user_row else None
+    
     # --- Get active subscription
     cursor.execute("""
         SELECT s.id, p.name, p.description, p.monthly_fee, p.included_units, p.overage_rate, s.start_date, s.end_date, s.is_active
         FROM subscriptions s
         JOIN plans p ON s.plan_id = p.id
         WHERE s.user_id = ? AND s.is_active = 1
-    """, (user_id,))
+    """, (u_id,))
     active_subscription = cursor.fetchone()
 
     if active_subscription:
@@ -47,8 +53,8 @@ def subscription_client():
             cursor.execute("""
                 INSERT INTO subscription_audit (user_id, tenant_id, action, old_plan_id, new_plan_id, timestamp)
                 VALUES (?, ?, 'cancelled', ?, NULL, ?)
-            """, (user_id, user["tenant_id"], active_subscription[0], datetime.utcnow().isoformat()))
-                        
+            """, (u_id, user["tenant_id"], active_subscription[0], datetime.utcnow().isoformat()))
+
             conn.commit()
             st.success("Subscription cancelled.")
             st.rerun()
@@ -89,18 +95,18 @@ def subscription_client():
         if st.button("✅ Subscribe to this plan"):
             # End current subscription if any
             cursor.execute("UPDATE subscriptions SET is_active = 0, end_date = ? WHERE user_id = ? AND is_active = 1", 
-                        (datetime.utcnow().strftime("%Y-%m-%d"), user_id))
+                        (datetime.utcnow().strftime("%Y-%m-%d"), u_id))
 
             # Add new subscription
             cursor.execute("""
                 INSERT INTO subscriptions (user_id, tenant_id, plan_id, start_date, is_active)
                 VALUES (?, ?, ?, ?, 1)
-            """, (user_id, user["tenant_id"], selected_plan[0], datetime.utcnow().strftime("%Y-%m-%d")))
-            
+            """, (u_id, user["tenant_id"], selected_plan[0], datetime.utcnow().strftime("%Y-%m-%d")))
+
             cursor.execute("""
                 INSERT INTO subscription_audit (user_id, tenant_id, action, old_plan_id, new_plan_id, timestamp)
                 VALUES (?, ?, 'subscribed', NULL, ?, ?)
-            """, (user_id, user["tenant_id"], selected_plan[0], datetime.utcnow().isoformat()))
+            """, (u_id, user["tenant_id"], selected_plan[0], datetime.utcnow().isoformat()))
             conn.commit()
 
             st.success("🎉 You’ve successfully subscribed to a new plan!")

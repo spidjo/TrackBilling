@@ -8,8 +8,12 @@ from email.mime.text import MIMEText
 from dotenv import load_dotenv
 import os
 from io import BytesIO
+from db.database import get_db_connection
+from utils.report_utils import generate_tenant_billing_report_pdf
 
 load_dotenv()
+
+APP_URL = os.getenv("APP_URL", "http://localhost:8501")
 
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))  # TLS = 587
@@ -17,22 +21,17 @@ EMAIL_USER = os.getenv("EMAIL_USER")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", EMAIL_USER)
 
-
-TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "..", "assets", "templates")
-
-env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
-
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 # Setup Jinja2 template environment
 templates_env = Environment(
-    loader=FileSystemLoader("templates"),
+    loader=FileSystemLoader('assets/templates'),
     autoescape=select_autoescape(["html", "xml"])
 )
 
 
 def render_html_email(subject, title, body):
-    template = env.get_template("email_base.html")
+    template = templates_env.get_template("email_base.html")
     return template.render(subject=subject, title=title, body=body, year=datetime.now().year)
 
 def send_email(to_email, subject, body_text, body_html=None):
@@ -91,9 +90,10 @@ def send_email_with_attachment(to_email, subject, body_text, filename, pdf_bytes
 
 
 def email_billing_report_to_admin(tenant_id, start_date, end_date):
+    print(f"Generating billing report for tenant_id {tenant_id} from {start_date} to {end_date}")
     conn = get_db_connection()
     cursor = conn.cursor()
-
+ 
     cursor.execute("""
         SELECT email, company_name FROM users
         WHERE tenant_id = ? AND role = 'admin'
@@ -102,7 +102,7 @@ def email_billing_report_to_admin(tenant_id, start_date, end_date):
     result = cursor.fetchone()
     if not result:
         print(f"No admin found for tenant_id {tenant_id}")
-        return
+        return 
 
     admin_email, company_name = result
     pdf_bytes = generate_tenant_billing_report_pdf(tenant_id, start_date, end_date)
@@ -121,19 +121,21 @@ def email_billing_report_to_admin(tenant_id, start_date, end_date):
         period=f"{start_date} to {end_date}"
     )
 
-    send_email_with_attachment(admin_email, subject, plain_body, filename, pdf_bytes.read(), html_body)
+    send_email_with_attachment(admin_email, subject, plain_body, filename, pdf_bytes, html_body)
 
 
 def send_password_reset_email(to_email, username, token):
-    reset_url = f"{BASE_URL}/reset-password?token={token}"
+    reset_url = f"{APP_URL}/reset-password?token={token}"
 
     # HTML and plain versions
     html_template = templates_env.get_template("password_reset.html")
-    html_content = html_template.render(username=username, reset_link=reset_url)
+    app_name = os.getenv("APP_NAME", "TrackBilling")
+    
+    html_content = html_template.render(username=username, reset_url=reset_url,app_name=app_name)
 
     text_content = f"Hi {username},\n\nYou requested a password reset. Use the link below:\n{reset_url}"
 
-    send_email(to_email, "Reset Your Password", text_content, html_content)
+    send_email(to_email=to_email, subject="Reset Your Password", body_text=text_content, body_html=html_content)
 
 def send_usage_alert_email(to_email, username, metric_name, usage, limit):
     # HTML and plain versions

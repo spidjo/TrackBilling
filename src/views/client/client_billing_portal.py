@@ -4,6 +4,41 @@ from utils.session import init_session_state
 from billing_engine import get_invoice_summary, generate_invoice_for_user
 from utils.pdf_utils import generate_invoice_pdf
 
+
+def get_tenant_info(cursor, tenant_id):
+    cursor.execute("SELECT name, address, email, phone FROM tenants WHERE id = ?", (tenant_id,))
+    row = cursor.fetchone()
+    if row:
+        return {
+            "name": row[0],
+            "address": row[1],
+            "email": row[2],
+            "phone": row[3],
+        }
+    return {}
+
+def get_client_info(cursor, user_id):
+    cursor.execute("""
+        SELECT first_name || ' ' || last_name AS name, company_name AS address, email
+        FROM users WHERE id = ?
+    """, (user_id,))
+    row = cursor.fetchone()
+    if row:
+        return {
+            "name": row[0],
+            "address": row[1],
+            "email": row[2]
+        }
+    return {}
+
+def get_user_id(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE username = ?", (user_id,))
+    user_row = cursor.fetchone()
+    conn.close()
+    return user_row[0] if user_row else None
+    
 def get_payment_history(invoice_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -31,19 +66,7 @@ def client_billing_portal():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    tenant_info = {
-        "name": "MzansiTel Communications",
-        "address": "123 Tech Road, Cape Town, South Africa",
-        "email": "billing@mzansitel.co.za",
-        "phone": "+27 11 123 4567"
-    }
-
-    client_info = {
-        "name": "John Doe",
-        "address": "456 Client St, Johannesburg",
-        "email": "john.doe@example.com"
-    }
+    
     # 1. Fetch active subscription and plan
     cursor.execute("""
         SELECT p.name, p.description, p.monthly_fee, p.included_units, p.overage_rate, s.start_date
@@ -51,7 +74,7 @@ def client_billing_portal():
         JOIN plans p ON s.plan_id = p.id
         WHERE s.user_id = ? AND s.is_active = 1
         ORDER BY s.start_date DESC LIMIT 1
-    """, (user_id,))
+    """, (get_user_id(user_id),))
     plan = cursor.fetchone()
 
     if not plan:
@@ -78,7 +101,7 @@ def client_billing_portal():
         WHERE user_id = ? AND tenant_id = ?
         GROUP BY metric_name
         ORDER BY metric_name
-    """, (user_id, tenant_id))
+    """, (get_user_id(user_id), tenant_id))
     usage_data = cursor.fetchall()
 
     if usage_data:
@@ -103,9 +126,11 @@ def client_billing_portal():
         FROM invoices
         WHERE user_id = ?
         ORDER BY invoice_date DESC
-    """, (user_id,))
+    """, (get_user_id(user_id),))
     invoice_rows = cursor.fetchall()
 
+    client_info = get_client_info(cursor=cursor, user_id=user_id)
+    tenant_info = get_tenant_info(cursor=cursor, tenant_id=tenant_id)
     if not invoice_rows:
         st.info("No invoices found.")
     else:

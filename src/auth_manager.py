@@ -103,7 +103,6 @@ def get_client_ip():
 
 # Logs the attempt to resend verification email, including user ID, timestamp, IP address, status, and reason
 def log_resend_attempt(user_id, status, reason=""):
-    print(f"Logging resend attempt for user_id={user_id}, status={status}, reason={reason}")  # TEMP
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -144,8 +143,8 @@ def resend_verification_email(username):
     if last_sent:
         try:
             last_time = datetime.fromisoformat(last_sent)
-            if datetime.utcnow() - last_time < timedelta(hours=1):
-                remaining = timedelta(hours=1) - (datetime.utcnow() - last_time)
+            if datetime.utcnow() - last_time < timedelta(minutes=1):
+                remaining = timedelta(minutes=1) - (datetime.utcnow() - last_time)
                 minutes = int(remaining.total_seconds() // 60)
                 log_resend_attempt(user_id, "blocked", f"Resend too soon. Wait {minutes} mins")
                 return {

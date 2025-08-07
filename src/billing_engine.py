@@ -1,12 +1,19 @@
 import sqlite3
 from datetime import datetime, timedelta
-from decimal import Decimal
-import os
-import uuid
+import os   
 from db.database import get_db_connection
 from services.record_usage import get_user_email
 from utils.pdf_utils import generate_invoice_pdf
-from utils.email_utils import send_email, send_email_with_attachment
+from utils.email_service import send_invoce_email
+
+
+# def get_user_id(user_id):
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     cursor.execute("SELECT id FROM users WHERE username = ?", (user_id,))
+#     user_row = cursor.fetchone()
+#     conn.close()
+#     return user_row[0] if user_row else None
 
 def get_billing_period_range(billing_period):
     start_date = datetime.strptime(billing_period + "-01", "%Y-%m-%d")
@@ -113,40 +120,20 @@ def generate_invoices(tenant_id, billing_period):
         client_info = get_client_info(cursor, user_id)
         logo_path = f"assets/logos/{tenant_id}.png" if os.path.exists(f"assets/logos/{tenant_id}.png") else None
 
+        client_name = client_info.get('name')
+        tenant_name = tenant_info.get('name')
         try:
-            pdf_bytes = generate_invoice_pdf(invoice, items, tenant_info, client_info, logo_path)
-            pdf_bytes.seek(0)
+            pdf_buffer = generate_invoice_pdf(invoice, items, tenant_info, client_info, logo_path)
+            pdf_buffer.seek(0)
 
             subject = f"Your Invoice #{invoice['id']} from {tenant_info.get('name', 'MzansiTel')}"
-            body = f"""
-            Dear {client_info.get('name', 'Customer')},
-
-            Attached is your invoice #{invoice['id']} dated {invoice['invoice_date']}.
-
-            Amount Due: R{invoice['total_amount']:.2f}
-            Status: {'Paid' if invoice['is_paid'] else 'Unpaid'}
-
-            Please see the invoice for full details.
-
-            Regards,
-            {tenant_info.get('name', 'MzansiTel')} Billing Team
-            """
-
-            smtp_settings = {
-                "host": os.getenv("SMTP_HOST") or "",
-                "port": int(os.getenv("SMTP_PORT") or 0),
-                "username": os.getenv("SMTP_USERNAME") or "",
-                "password": os.getenv("SMTP_PASSWORD") or "",
-                "sender": os.getenv("EMAIL_SENDER") or "",
-            }
-
-            if not all(smtp_settings.values()):
-                raise ValueError("Incomplete SMTP configuration. Check environment variables.")
-
-            send_email_with_attachment(
-                'siphiwolum@gmail.com', subject, body,
-                f"invoice_{invoice['id']}.pdf", pdf_bytes
-            )
+            
+            pdf_bytes = pdf_buffer.getvalue()
+            
+            send_invoce_email(to_email=user_email, subject=subject, client_name=client_name, invoice_id=invoice['id'],
+                              invoice_date=datetime.utcnow().strftime("%Y-%m-%d"), invoice_amount=invoice['total_amount'], pdf_bytes=pdf_bytes, 
+                              is_paid=0, tenant_name=tenant_name)
+            
 
         except Exception as email_error:
             print(f"⚠️ Email not sent for user {user_id}: {str(email_error)}")
@@ -273,7 +260,6 @@ def estimate_invoice_for_user(user_id, tenant_id):
                 "date": today.strftime("%Y-%m-%d")
             })
             total += overage_cost
-
     conn.close()
     return items, total
 
@@ -364,7 +350,7 @@ def auto_generate_invoices():
         cursor.execute("""
             INSERT INTO invoices (user_id, tenant_id, invoice_date, period_start, period_end, total_amount, is_paid)
             VALUES (?, ?, ?, ?, ?, ?, 0)
-        """, (user_id, tenant_id, today, start_period, end_period, estimated_total))
+        """, (get_user_id(user_id), tenant_id, today, start_period, end_period, estimated_total))
         invoice_id = cursor.lastrowid
 
         # Insert invoice items

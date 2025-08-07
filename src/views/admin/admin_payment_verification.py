@@ -29,6 +29,7 @@ def admin_payment_verification():
     """, (tenant_id,))
     rows = cursor.fetchall()
 
+    print(f"Found {len(rows)} pending payments for tenant {tenant_id}")
     if not rows:
         st.success("✅ No pending payments.")
         return

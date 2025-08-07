@@ -11,6 +11,45 @@ from datetime import datetime
 from PyPDF2 import PdfReader
 import base64
 
+def get_tenant_info(tenant_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name, address, email, phone FROM tenants WHERE id = ?", (tenant_id,))
+    row = cursor.fetchone()
+    if row:
+        return {
+            "name": row[0],
+            "address": row[1],
+            "email": row[2],
+            "phone": row[3],
+        }
+    conn.close()
+    return {}
+
+def get_client_info(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT first_name || ' ' || last_name AS name, company_name AS address, email
+        FROM users WHERE id = ?
+    """, (user_id,))
+    row = cursor.fetchone()
+    if row:
+        return {
+            "name": row[0],
+            "address": row[1],
+            "email": row[2]
+        }
+    conn.close()
+    return {}
+
+def get_user_id(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE username = ?", (user_id,))
+    user_row = cursor.fetchone()
+    conn.close()
+    return user_row[0] if user_row else None
 
 def client_dashboard():
     init_session_state()
@@ -25,18 +64,8 @@ def client_dashboard():
 
     st.title("📊 Client Dashboard")
 
-    tenant_info = {
-        "name": "MzansiTel Communications",
-        "address": "123 Tech Road, Cape Town, South Africa",
-        "email": "billing@mzansitel.co.za",
-        "phone": "+27 11 123 4567"
-    }
-
-    client_info = {
-        "name": "John Doe",
-        "address": "456 Client St, Johannesburg",
-        "email": "john.doe@example.com"
-    }
+    client_info = get_client_info(user_id=user_id)
+    tenant_info = get_tenant_info(tenant_id=tenant_id)
     
     included_units = 0  # default fallback if no active plan found
     tabs = st.tabs(["📦 Plan Overview", "📊 Usage Analytics", "🧾 Latest Invoice", "📜 Invoice History", "🔔 Notifications"])
@@ -45,13 +74,14 @@ def client_dashboard():
     with tabs[0]:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
         cursor.execute("""
             SELECT p.name, p.description, p.monthly_fee, p.included_units, p.overage_rate, s.start_date
             FROM subscriptions s
             JOIN plans p ON s.plan_id = p.id
             WHERE s.user_id = ? AND s.is_active = 1
             ORDER BY s.start_date DESC LIMIT 1
-        """, (user_id,))
+        """, (get_user_id(user_id),))
         plan = cursor.fetchone()
         conn.close()
 
@@ -81,7 +111,7 @@ def client_dashboard():
             FROM usage_records
             WHERE user_id = ? AND tenant_id = ?
         """
-        params = [user_id, tenant_id]
+        params = [get_user_id(user_id), tenant_id]
 
         if metric_filter:
             query += " AND metric_type LIKE ?"
@@ -155,7 +185,7 @@ def client_dashboard():
         cursor.execute("""
             SELECT id FROM invoices
             WHERE user_id = ? ORDER BY invoice_date DESC LIMIT 1
-        """, (user_id,))
+        """, (get_user_id(user_id),))
         row = cursor.fetchone()
         conn.close()
 
@@ -187,7 +217,7 @@ def client_dashboard():
             status_filter = st.selectbox("Filter by Status", ["All", "Paid", "Unpaid"])
 
         query = "SELECT id, invoice_date, period_start, period_end, total_amount, is_paid FROM invoices WHERE user_id = ?"
-        params = [user_id]
+        params = [get_user_id(user_id)]
 
         if len(date_range) == 2:
             query += " AND invoice_date BETWEEN ? AND ?"
@@ -275,7 +305,7 @@ def client_dashboard():
             SELECT COALESCE(SUM(usage_amount), 0)
             FROM usage_records
             WHERE user_id = ? AND tenant_id = ? AND usage_date BETWEEN ? AND ?
-        """, (user_id, tenant_id, first_day, last_day))
+        """, (get_user_id(user_id), tenant_id, first_day, last_day))
         monthly_usage = cursor.fetchone()[0] or 0
 
         if included_units > 0:

@@ -7,6 +7,14 @@ from db.database import get_db_connection
 from utils.session_guard import require_login
 from pathlib import Path
 
+def get_user_id(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE username = ?", (user_id,))
+    user_row = cursor.fetchone()
+    conn.close()
+    return user_row[0] if user_row else None
+
 def client_payment_view():
     st.set_page_config(page_title="💰 My Payments", layout="wide")
     require_login('client')
@@ -27,7 +35,7 @@ def client_payment_view():
         FROM invoices
         WHERE user_id = ? AND is_paid = 0
         ORDER BY invoice_date DESC
-    """, (user_id,))
+    """, (get_user_id(user_id),))
     invoices = cursor.fetchall()
 
     if not invoices:
@@ -51,7 +59,7 @@ def client_payment_view():
                         # Save file
                         save_dir = Path("uploaded_receipts")
                         save_dir.mkdir(exist_ok=True)
-                        filename = f"receipt_{invoice_id}_{user['id']}_{receipt_file.name}"
+                        filename = f"receipt_{invoice_id}_{user_id}_{receipt_file.name}"
                         file_path = save_dir / filename
 
                         with open(file_path, "wb") as f:
@@ -62,7 +70,7 @@ def client_payment_view():
                             INSERT INTO payments (user_id, invoice_id, amount, payment_date, payment_method, receipt_path, is_verified)
                             VALUES (?, ?, ?, ?, ?, ?, 0)
                         """, (
-                            user["id"],
+                            get_user_id(user_id),
                             invoice_id,
                             amount,
                             payment_date.strftime("%Y-%m-%d"),

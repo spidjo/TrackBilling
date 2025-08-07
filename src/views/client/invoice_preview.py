@@ -11,7 +11,7 @@ def invoice_preview():
     if not user:
         st.stop()
     st.title("🧾 Invoice Preview")
-    user_id = user["id"]
+    user_id = user["username"]
     tenant_id = user["tenant_id"]
 
     if not user_id or not tenant_id:

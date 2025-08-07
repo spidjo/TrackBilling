@@ -4,13 +4,14 @@ import streamlit as st
 from db.database import get_db_connection
 from werkzeug.security import generate_password_hash
 from urllib.parse import parse_qs
+import bcrypt
 import time
 
 def reset_password():
     st.title("🔐 Create a New Password")
 
     query_params = st.query_params
-    token = query_params.get("token", [None])[0]
+    token = query_params.get("token",)
 
     if not token:
         st.error("❌ Invalid or missing token.")
@@ -40,7 +41,7 @@ def reset_password():
         elif len(new_pass) < 8:
             st.error("🔐 Password must be at least 8 characters.")
         else:
-            hashed = generate_password_hash(new_pass)
+            hashed = bcrypt.hashpw(new_pass.encode(), bcrypt.gensalt())
             cursor.execute("UPDATE users SET password = ? WHERE id = ?", (hashed, user_id))
             cursor.execute("UPDATE password_resets SET is_used = 1 WHERE token = ?", (token,))
             conn.commit()

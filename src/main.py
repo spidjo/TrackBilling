@@ -7,6 +7,7 @@ from utils.session import init_session_state
 from views.auth.auth_view import auth_view
 from views.auth.reset_password import reset_password
 from views.auth.reset_password_request import reset_password_request
+from auth_manager import verify_token 
 
 # --- SuperAdmin views
 from views.superadmin.superadmin_dashboard import superadmin_dashboard
@@ -74,6 +75,16 @@ def main():
     query_params = st.query_params
 
     # --- Auth Routes
+    if "verify" in query_params:
+        token = query_params.get("verify")
+        if token:
+            result = verify_token(token)
+            if result.get("success"):
+                st.success("✅ Email verified successfully!")
+            else:
+                st.error(f"❌ {result.get('error', 'Verification failed.')}")
+        return
+    
     if "token" in query_params:
         reset_password()
         return
@@ -93,6 +104,10 @@ def main():
         st.sidebar.subheader("🛠️ SuperAdmin Panel")
         menu = st.sidebar.radio("Navigate", list(SUPERADMIN_MENU.keys()))
         SUPERADMIN_MENU[menu]()
+        if st.sidebar.button("📜 Run monthly billing"):
+            run_monthly_report()
+            st.success("Monthly billing reports generated and emailed to admins.")
+            st.rerun()
 
     elif role == "admin":
         st.sidebar.subheader("🧑‍💼 Admin Panel")
