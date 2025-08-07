@@ -14,6 +14,7 @@ from views.superadmin.superadmin_dashboard import superadmin_dashboard
 from views.superadmin.tenant_manager import tenant_manager
 from views.superadmin.admin_analytics_dashboard import render_admin_analytics_dashboard
 from views.superadmin.resend_log_view import resend_log_view
+from views.superadmin.monthly_report_scheduler import run_monthly_report
 
 # --- Admin views
 from views.admin.admin_dashboard import admin_dashboard
