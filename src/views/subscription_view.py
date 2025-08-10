@@ -12,7 +12,7 @@ def manage_subscriptions():
     cursor = conn.cursor()
 
     # View all plans from this tenant
-    plans = cursor.execute("SELECT id, name FROM plans WHERE tenant_id = ?", (tenant_id,)).fetchall()
+    plans = cursor.execute("SELECT id, name FROM plans WHERE tenant_id = %s", (tenant_id,)).fetchall()
     plan_options = {name: pid for pid, name in plans}
 
     st.markdown("### Subscribe to a Plan")
@@ -21,7 +21,7 @@ def manage_subscriptions():
         user_id = st.session_state.username  # optionally map username to ID
         cursor.execute("""
             INSERT INTO subscriptions (user_id, plan_id, tenant_id)
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
         """, (user_id, plan_options[plan_choice], tenant_id))
         conn.commit()
         st.success("Subscription activated.")
@@ -32,7 +32,7 @@ def manage_subscriptions():
         SELECT s.id, p.name
         FROM subscriptions s
         JOIN plans p ON s.plan_id = p.id
-        WHERE s.tenant_id = ? AND s.user_id = ?
+        WHERE s.tenant_id = %s AND s.user_id = %s
     """, (tenant_id, st.session_state.username)).fetchall()
 
     for row in rows:

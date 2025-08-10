@@ -18,25 +18,25 @@ def record_payment(invoice_id, amount, method='manual', notes=None):
     # Insert payment record into the payments table
     cursor.execute("""
         INSERT INTO payments (invoice_id, amount, payment_method, notes)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     """, (invoice_id, amount, method, notes))
 
     # Retrieve the total amount due for the invoice
-    cursor.execute("SELECT total_amount FROM invoices WHERE id = ?", (invoice_id,))
+    cursor.execute("SELECT total_amount FROM invoices WHERE id = %s", (invoice_id,))
     total = cursor.fetchone()
     if total:
         total_amount = total[0]
 
         # Calculate the total amount paid so far for this invoice
         cursor.execute("""
-            SELECT SUM(amount) FROM payments WHERE invoice_id = ?
+            SELECT SUM(amount) FROM payments WHERE invoice_id = %s
         """, (invoice_id,))
         total_paid = cursor.fetchone()[0] or 0.0
 
         # If the invoice is fully paid or overpaid, mark it as paid
         if total_paid >= total_amount:
             cursor.execute("""
-                UPDATE invoices SET is_paid = 1 WHERE id = ?
+                UPDATE invoices SET is_paid = TRUE WHERE id = %s
             """, (invoice_id,))
 
     # Commit changes and close the connection

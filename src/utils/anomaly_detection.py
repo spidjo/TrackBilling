@@ -11,7 +11,7 @@ def detect_anomalies(user_id, metric_type, threshold=2.0):
     cursor.execute("""
         SELECT usage_date, quantity
         FROM usage_metrics
-        WHERE user_id = ? AND metric_type = ? AND usage_date >= ?
+        WHERE user_id = %s AND metric_type = %s AND usage_date >= %s
         ORDER BY usage_date
     """, (user_id, metric_type, last_7_days))
     rows = cursor.fetchall()

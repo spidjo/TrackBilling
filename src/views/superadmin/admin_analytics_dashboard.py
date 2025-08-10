@@ -1,23 +1,93 @@
-#src/views/superadmin/admin_analytics_dashboard.py
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
 from db.database import get_db_connection
 from datetime import datetime, timedelta
-from dateutil import parser
+from decimal import Decimal
+from utils.session_guard import require_login
+
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .metric-card {
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background-color: #f8f9fa;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .positive-metric {
+        border-left: 5px solid #4CAF50;
+    }
+    .negative-metric {
+        border-left: 5px solid #F44336;
+    }
+    .neutral-metric {
+        border-left: 5px solid #2196F3;
+    }
+    .alert-card {
+        border-radius: 10px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        background-color: #fff3e0;
+        border-left: 5px solid #FF9800;
+    }
+    .tab-container {
+        padding: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+def safe_divide(numerator, denominator):
+    """Safely divide Decimal and float values"""
+    try:
+        if isinstance(numerator, Decimal):
+            numerator = float(numerator)
+        return numerator / denominator if denominator != 0 else 0
+    except Exception:
+        return 0
 
 def render_admin_analytics_dashboard():
+    require_login('superadmin')
+    st.set_page_config(page_title="📊 Admin Analytics Dashboard", layout="wide")
     st.title("📊 Admin Analytics Dashboard")
+    st.markdown("Comprehensive analytics and monitoring for platform administrators")
+
+    # --- Sidebar Filters ---
+    with st.sidebar:
+        st.subheader("🔍 Filters")
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input(
+                "Start Date",
+                datetime.today() - timedelta(days=180),
+                help="Select start date for analysis period"
+            )
+        with col2:
+            end_date = st.date_input(
+                "End Date",
+                datetime.today(),
+                help="Select end date for analysis period"
+            )
+
+        # Add time period quick select buttons
+        st.markdown("**Quick Select:**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("30 Days"):
+                start_date = datetime.today() - timedelta(days=30)
+        with col2:
+            if st.button("90 Days"):
+                start_date = datetime.today() - timedelta(days=90)
+        with col3:
+            if st.button("1 Year"):
+                start_date = datetime.today() - timedelta(days=365)
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # --- Sidebar Filters ---
-    st.sidebar.subheader("Filters")
-    start_date = st.sidebar.date_input("Start Date", datetime.today() - timedelta(days=180))
-    end_date = st.sidebar.date_input("End Date", datetime.today())
-
+    # --- Tabs ---
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📈 Key Metrics",
         "💡 CLV",
@@ -28,180 +98,353 @@ def render_admin_analytics_dashboard():
         "🔔 Notifications"
     ])
 
+    # ---------------------- TAB 1: Key Metrics ----------------------
     with tab1:
-        st.subheader("💰 Key Metrics")
-        cursor.execute("""
-            SELECT tenant_id, strftime('%Y-%m', invoice_date) as month, SUM(total_amount) as revenue
-            FROM invoices
-            WHERE invoice_date BETWEEN ? AND ?
-            GROUP BY tenant_id, month
-        """, (start_date, end_date))
-        revenue_data = cursor.fetchall()
+        st.subheader("💰 Key Performance Indicators")
+        
+        # Fetch all metrics in single query for efficiency
+        with st.spinner("Loading metrics..."):
+            cursor.execute("""
+                SELECT 
+                    (SELECT COALESCE(SUM(total_amount), 0) FROM invoices 
+                     WHERE invoice_date BETWEEN %s AND %s) as total_revenue,
+                    (SELECT COUNT(DISTINCT user_id) FROM subscriptions 
+                     WHERE is_active) as active_subs,
+                    (SELECT COUNT(*) FROM users 
+                     WHERE registration_date BETWEEN %s AND %s) as new_users,
+                    (SELECT COUNT(*) FROM invoices 
+                     WHERE is_paid = FALSE AND invoice_date BETWEEN %s AND %s) as unpaid_invoices
+            """, (start_date, end_date, start_date, end_date, start_date, end_date))
+            
+            metrics = cursor.fetchone()
+            total_revenue, active_subs, new_users, unpaid_invoices = metrics
 
-        df_rev = pd.DataFrame(revenue_data, columns=["tenant_id", "month", "revenue"])
-        df_mrr = df_rev.groupby("month").agg(mrr=("revenue", "sum")).reset_index()
-        df_arpu = df_rev.groupby("tenant_id").agg(arpu=("revenue", "mean"))
+            # Calculate derived metrics with proper type handling
+            period_months = (end_date - start_date).days / 30.0
+            mrr = safe_divide(total_revenue, period_months)
+            arpu = safe_divide(total_revenue, active_subs)
 
-        st.metric("📈 Total MRR (last month)", f"R{df_mrr['mrr'].iloc[-1]:,.2f}" if not df_mrr.empty else "N/A")
-        st.metric("📊 Avg ARPU per Tenant", f"R{df_arpu['arpu'].mean():.2f}" if not df_arpu.empty else "N/A")
+            # Format metrics for display
+            def format_currency(value):
+                return f"R{float(value):,.2f}" if value else "R0.00"
 
-        cursor.execute("""
-            SELECT strftime('%Y-%m', start_date) as month, COUNT(DISTINCT user_id)
-            FROM subscriptions
-            WHERE is_active = 1
-            GROUP BY month
-            ORDER BY month
-        """)
-        subs = cursor.fetchall()
-        df_churn = pd.DataFrame(subs, columns=["month", "active_users"])
-        df_churn["churn"] = df_churn["active_users"].diff(-1) * -1
+            # Metrics cards
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.markdown(f"""
+                <div class="metric-card positive-metric">
+                    <h3>📈 Monthly Recurring Revenue</h3>
+                    <h2>{format_currency(mrr)}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div class="metric-card neutral-metric">
+                    <h3>📊 Avg Revenue Per User</h3>
+                    <h2>{format_currency(arpu)}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div class="metric-card positive-metric">
+                    <h3>👥 Active Subscriptions</h3>
+                    <h2>{active_subs:,}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                st.markdown(f"""
+                <div class="metric-card negative-metric">
+                    <h3>🧾 Unpaid Invoices</h3>
+                    <h2>{unpaid_invoices:,}</h2>
+                </div>
+                """, unsafe_allow_html=True)
 
-        st.line_chart(df_churn.set_index("month")["active_users"], height=250, use_container_width=True)
-        st.caption("👥 Active Subscriptions over Time")
+        # Subscription trend chart
+        st.subheader("📊 Subscription Trends")
+        with st.spinner("Loading subscription data..."):
+            cursor.execute("""
+                SELECT TO_CHAR(start_date, 'YYYY-MM') as month, 
+                       COUNT(DISTINCT user_id) as active_users
+                FROM subscriptions
+                WHERE is_active AND start_date BETWEEN %s AND %s
+                GROUP BY month
+                ORDER BY month
+            """, (start_date, end_date))
+            
+            subs = cursor.fetchall()
+            
+            if subs:
+                df_churn = pd.DataFrame(subs, columns=["month", "active_users"])
+                fig = px.line(
+                    df_churn,
+                    x="month",
+                    y="active_users",
+                    markers=True,
+                    title="Active Subscriptions Over Time",
+                    template="plotly_white"
+                )
+                fig.update_layout(
+                    xaxis_title="Month",
+                    yaxis_title="Active Subscriptions",
+                    hovermode="x unified"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No subscription data available")
 
+    # ---------------------- TAB 2: Customer Lifetime Value ----------------------
     with tab2:
         st.subheader("💡 Customer Lifetime Value (CLV)")
+        
         cursor.execute("""
-            SELECT s.tenant_id, s.user_id, t.name, MIN(s.start_date), MAX(s.start_date)
+            SELECT s.tenant_id, t.name, 
+                   AVG(i.total_amount) as avg_revenue,
+                   COUNT(DISTINCT s.user_id) as users
             FROM subscriptions s
             JOIN tenants t ON s.tenant_id = t.id
-            WHERE s.is_active = 1
-            GROUP BY s.tenant_id, s.user_id
+            JOIN invoices i ON s.user_id = i.user_id AND s.tenant_id = i.tenant_id
+            WHERE s.is_active
+            GROUP BY s.tenant_id, t.name
         """)
-        rows = cursor.fetchall()
-        data = []
-        for t_id, u_id, tenant_name, min_date, max_date in rows:
-            months = (parser.parse(str(max_date)) - parser.parse(str(min_date))).days / 30
-            arpu = df_arpu.loc[t_id, "arpu"] if t_id in df_arpu.index else 0
-            data.append((t_id, u_id, tenant_name, arpu * months))
-        df_clv = pd.DataFrame(data, columns=["tenant_id", "user_id", "tenant_name", "CLV"])
+        clv_data = cursor.fetchall()
+        
+        if clv_data:
+            df_clv = pd.DataFrame(clv_data, columns=["tenant_id", "tenant_name", "avg_revenue", "users"])
+            fig = px.bar(
+                df_clv,
+                x="tenant_name",
+                y="avg_revenue",
+                color="users",
+                title="Average Revenue per Tenant",
+                labels={"avg_revenue": "Average Revenue (R)"}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No CLV data available")
 
-        st.bar_chart(df_clv.groupby("tenant_name")["CLV"].mean())
-
+    # ---------------------- TAB 3: Retention & Acquisition ----------------------
     with tab3:
         st.subheader("🔁 Retention & Acquisition")
+        
         cursor.execute("""
-            SELECT strftime('%Y-%m', registration_date) as month, COUNT(*) FROM users
+            SELECT TO_CHAR(registration_date, 'YYYY-MM') as month, 
+                   COUNT(*) as new_users
+            FROM users
+            WHERE registration_date BETWEEN %s AND %s
             GROUP BY month
-        """)
-        reg = cursor.fetchall()
-        df_reg = pd.DataFrame(reg, columns=["month", "new_users"])
+            ORDER BY month
+        """, (start_date, end_date))
+        
+        reg_data = cursor.fetchall()
+        
+        if reg_data:
+            df_reg = pd.DataFrame(reg_data, columns=["month", "new_users"])
+            fig = px.line(
+                df_reg,
+                x="month",
+                y="new_users",
+                markers=True,
+                title="New User Registrations"
+            )
+            fig.update_layout(
+                xaxis_title="Month",
+                yaxis_title="New Users",
+                hovermode="x unified"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No registration data available")
 
-        st.line_chart(df_reg.set_index("month"), use_container_width=True)
-        st.caption("📥 New Client Registrations")
-
+    # ---------------------- TAB 4: Inactive Clients ----------------------
     with tab4:
         st.subheader("⚠️ Inactive Clients")
+        
         inactive_cutoff = datetime.today() - timedelta(days=30)
         cursor.execute("""
-            SELECT DISTINCT u.username FROM users u
+            SELECT DISTINCT u.username 
+            FROM users u
             LEFT JOIN usage_records um ON u.id = um.user_id
-            WHERE (um.usage_date IS NULL OR um.usage_date < ?) AND u.role = 'client'
+            WHERE (um.usage_date IS NULL OR um.usage_date < %s) 
+            AND u.role = 'client'
         """, (inactive_cutoff,))
+        
         inactive_clients = [row[0] for row in cursor.fetchall()]
+        
         if inactive_clients:
-            st.warning(f"⚠️ {len(inactive_clients)} clients inactive in last 30 days:")
-            st.write(inactive_clients)
+            st.markdown(f"""
+            <div class="alert-card">
+                <h3>🚨 {len(inactive_clients)} Inactive Clients</h3>
+                <p>No activity in last 30 days</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.dataframe(
+                pd.DataFrame(inactive_clients, columns=["Username"]),
+                use_container_width=True
+            )
         else:
             st.success("✅ No inactive clients in the past 30 days.")
 
+    # ---------------------- TAB 5: Revenue Breakdown ----------------------
     with tab5:
-        st.subheader("💵 Revenue Breakdown by Plan")
-        cursor.execute("""
-            SELECT p.name AS plan_name, SUM(i.total_amount) AS revenue
-            FROM invoices i
-            JOIN subscriptions s ON i.user_id = s.user_id AND s.is_active = 1
-            JOIN plans p ON s.plan_id = p.id
-            WHERE i.tenant_id = s.tenant_id
-            GROUP BY p.name
-        """)
-        plan_rev = cursor.fetchall()
-        df_plan = pd.DataFrame(plan_rev, columns=["Plan", "Revenue"])
-        st.bar_chart(df_plan.set_index("Plan"))
+        st.subheader("💵 Revenue Breakdown")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### By Plan")
+            cursor.execute("""
+                SELECT p.name, SUM(i.total_amount) as revenue
+                FROM invoices i
+                JOIN subscriptions s ON i.user_id = s.user_id
+                JOIN plans p ON s.plan_id = p.id
+                WHERE i.invoice_date BETWEEN %s AND %s
+                GROUP BY p.name
+            """, (start_date, end_date))
+            
+            plan_rev = cursor.fetchall()
+            
+            if plan_rev:
+                df_plan = pd.DataFrame(plan_rev, columns=["Plan", "Revenue"])
+                fig = px.pie(
+                    df_plan,
+                    names="Plan",
+                    values="Revenue",
+                    title="Revenue by Plan"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No revenue data by plan")
+        
+        with col2:
+            st.markdown("#### By Tenant")
+            cursor.execute("""
+                SELECT t.name, SUM(i.total_amount) as revenue
+                FROM invoices i
+                JOIN tenants t ON i.tenant_id = t.id
+                WHERE i.invoice_date BETWEEN %s AND %s
+                GROUP BY t.name
+            """, (start_date, end_date))
+            
+            tenant_rev = cursor.fetchall()
+            
+            if tenant_rev:
+                df_tenant = pd.DataFrame(tenant_rev, columns=["Tenant", "Revenue"])
+                fig = px.bar(
+                    df_tenant,
+                    x="Tenant",
+                    y="Revenue",
+                    title="Revenue by Tenant"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No revenue data by tenant")
 
-        cursor.execute("""
-            SELECT t.name AS tenant_name, SUM(i.total_amount) AS revenue
-            FROM invoices i
-            JOIN tenants t ON i.tenant_id = t.id
-            GROUP BY t.name
-        """)
-        tenant_rev = cursor.fetchall()
-        df_trev = pd.DataFrame(tenant_rev, columns=["Tenant", "Revenue"])
-        st.subheader("🏢 Revenue Breakdown by Tenant")
-        st.bar_chart(df_trev.set_index("Tenant"))
-
+    # ---------------------- TAB 6: Payment Status ----------------------
     with tab6:
         st.subheader("🧾 Invoice Payment Status")
-        cursor.execute("SELECT is_paid, COUNT(*) FROM invoices GROUP BY is_paid")
-        status_counts = cursor.fetchall()
-        df_status = pd.DataFrame(status_counts, columns=["is_paid", "count"])
-        df_status["label"] = df_status["is_paid"].map({0: "Unpaid", 1: "Paid"})
-        fig, ax = plt.subplots()
-        ax.pie(df_status["count"], labels=df_status["label"], autopct='%1.1f%%', startangle=90)
-        st.pyplot(fig)
-        st.caption("🧾 Invoice Payment Status")
+        
+        cursor.execute("""
+            SELECT is_paid, COUNT(*) as count 
+            FROM invoices 
+            GROUP BY is_paid
+        """)
+        
+        status_data = cursor.fetchall()
+        
+        if status_data:
+            df_status = pd.DataFrame(status_data, columns=["is_paid", "count"])
+            df_status["status"] = df_status["is_paid"].map({True: "Paid", False: "Unpaid"})
+            
+            fig = px.pie(
+                df_status,
+                names="status",
+                values="count",
+                title="Payment Status Distribution",
+                color="status",
+                color_discrete_map={"Paid": "#4CAF50", "Unpaid": "#F44336"}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No invoice data available")
+
+    # ---------------------- TAB 7: Notifications ----------------------
     with tab7:
         st.subheader("🔔 Global Notifications Center")
-
-        # --- Overdue Invoices by Tenant ---
-        st.markdown("### 🚨 Tenants with Overdue Invoices")
+        
+        # Overdue Invoices
+        st.markdown("### 🚨 Overdue Invoices")
         cursor.execute("""
-            SELECT t.name, t.id, COUNT(*) as overdue_count, SUM(i.total_amount) as total_due
+            SELECT t.name, COUNT(*) as overdue_count, 
+                   SUM(i.total_amount) as total_due
             FROM invoices i
             JOIN tenants t ON i.tenant_id = t.id
-            WHERE i.is_paid = 0
-            GROUP BY i.tenant_id
-            HAVING overdue_count > 0
+            WHERE i.is_paid = FALSE
+            GROUP BY t.name
+            ORDER BY total_due DESC
         """)
-        overdue = cursor.fetchall()
-        if overdue:
-            df_overdue = pd.DataFrame(overdue, columns=["Tenant Name", "Tenant ID", "Overdue Count", "Total Due"])
-            st.warning(f"{len(df_overdue)} tenants have overdue invoices.")
-            st.dataframe(df_overdue, use_container_width=True)
+        
+        overdue_data = cursor.fetchall()
+        
+        if overdue_data:
+            df_overdue = pd.DataFrame(overdue_data, columns=["Tenant", "Overdue Count", "Total Due"])
+            st.dataframe(
+                df_overdue.style.format({"Total Due": "R{:.2f}"}),
+                use_container_width=True
+            )
         else:
-            st.success("✅ No tenants with overdue invoices.")
-
-        # --- Tenants near usage limits ---
-        st.markdown("### ⚠️ Tenants Near Usage Limits")
+            st.success("✅ No overdue invoices")
+        
+        # Usage Alerts
+        st.markdown("### ⚠️ Usage Alerts")
         cursor.execute("""
-            SELECT t.name, SUM(um.usage_amount) as total_usage, p.included_units
+            SELECT t.name, SUM(um.usage_amount) as usage, 
+                   p.included_units as limit
             FROM usage_records um
             JOIN tenants t ON um.tenant_id = t.id
             JOIN subscriptions s ON um.tenant_id = s.tenant_id
             JOIN plans p ON s.plan_id = p.id
-            WHERE s.is_active = 1
-            GROUP BY s.tenant_id, p.included_units
+            WHERE s.is_active
+            GROUP BY t.name, p.included_units
+            HAVING SUM(um.usage_amount) >= 0.8 * p.included_units
         """)
-        usage_alerts = []
-        for row in cursor.fetchall():
-            name, used, limit = row
-            if limit and used >= 0.8 * limit:
-                usage_alerts.append((name, used, limit))
-
+        
+        usage_alerts = cursor.fetchall()
+        
         if usage_alerts:
-            df_usage = pd.DataFrame(usage_alerts, columns=["Tenant Name", "Usage", "Plan Limit"])
-            st.error("Some tenants are nearing or exceeding their usage limits.")
-            st.dataframe(df_usage, use_container_width=True)
+            df_usage = pd.DataFrame(usage_alerts, columns=["Tenant", "Usage", "Limit"])
+            df_usage["% Used"] = (df_usage["Usage"] / df_usage["Limit"] * 100).round(1)
+            st.dataframe(
+                df_usage.style.format({"Usage": "{:.0f}", "Limit": "{:.0f}", "% Used": "{:.1f}%"}),
+                use_container_width=True
+            )
         else:
-            st.success("✅ All tenants are within usage limits.")
-
-        # --- Inactive Tenants (No usage in last 30 days) ---
+            st.success("✅ No usage limit alerts")
+        
+        # Inactive Tenants
         st.markdown("### 📉 Inactive Tenants")
         cursor.execute("""
-            SELECT DISTINCT t.name
-            FROM usage_metrics um
-            JOIN tenants t ON um.tenant_id = t.id
-            WHERE um.usage_date >= DATE('now', '-30 day')
+            SELECT t.name
+            FROM tenants t
+            WHERE NOT EXISTS (
+                SELECT 1 FROM usage_records um
+                WHERE um.tenant_id = t.id
+                AND um.usage_date >= CURRENT_DATE - INTERVAL '30 days'
+            )
         """)
-        active_tenants = {r[0] for r in cursor.fetchall()}
-
-        cursor.execute("SELECT DISTINCT name FROM tenants")
-        all_tenants = {r[0] for r in cursor.fetchall()}
-
-        inactive = list(all_tenants - active_tenants)
-        if inactive:
-            st.info(f"{len(inactive)} tenants had no usage activity in the last 30 days.")
-            st.write(inactive)
+        
+        inactive_tenants = [row[0] for row in cursor.fetchall()]
+        
+        if inactive_tenants:
+            st.warning(f"⚠️ {len(inactive_tenants)} tenants with no recent activity")
+            st.write(inactive_tenants)
         else:
-            st.success("✅ All tenants have recent activity.")
+            st.success("✅ All tenants have recent activity")
+
     conn.close()
+
+if __name__ == "__main__":
+    render_admin_analytics_dashboard()

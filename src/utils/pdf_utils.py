@@ -1,3 +1,4 @@
+# src/utils/pdf_utils.py
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
@@ -6,18 +7,26 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from io import BytesIO
 import os
+from datetime import datetime
 
 def generate_invoice_pdf(invoice, items, tenant_info=None, client_info=None, logo_path=None):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            leftMargin=20*mm, rightMargin=20*mm,
-                            topMargin=30*mm, bottomMargin=20*mm)
+                          leftMargin=20*mm, rightMargin=20*mm,
+                          topMargin=30*mm, bottomMargin=20*mm)
     elements = []
     styles = getSampleStyleSheet()
 
     # === SAFE DEFAULTS ===
     tenant_info = tenant_info or {}
     client_info = client_info or {}
+    
+    # Ensure invoice has required fields with fallbacks
+    invoice_id = invoice.get('id', 'N/A')
+    invoice_date = invoice.get('invoice_date', datetime.now().strftime('%Y-%m-%d'))
+    period_start = invoice.get('period_start', invoice_date)
+    period_end = invoice.get('period_end', invoice_date)
+    total_amount = invoice.get('total_amount', 0.00)
 
     # --- Header with Logo and Tenant Info ---
     header_table_data = []
@@ -54,20 +63,22 @@ def generate_invoice_pdf(invoice, items, tenant_info=None, client_info=None, log
 
     # --- Invoice Info ---
     elements.append(Paragraph(f"""
-        <b>Invoice #: </b> {invoice['id']}<br/>
-        <b>Date: </b> {invoice.get('invoice_date', '')}<br/>
-        <b>Period:</b> {invoice['period_start']} to {invoice['period_end']}
+        <b>Invoice #: </b> {invoice_id}<br/>
+        <b>Date: </b> {invoice_date}<br/>
+        <b>Period:</b> {period_start} to {period_end}
     """, styles["Normal"]))
     elements.append(Spacer(1, 12))
 
     # --- Invoice Items Table ---
     table_data = [["Description", "Quantity", "Unit Price", "Amount"]]
     for item in items:
+        quantity = item.get("quantity", 0)
+        unit_price = item.get("unit_price", 0.00)
         table_data.append([
-            item["description"],
-            str(item["quantity"]),
-            f"R{item['unit_price']:.2f}",
-            f"R{item['quantity'] * item['unit_price']:.2f}"
+            item.get("description", "Item"),
+            str(quantity),
+            f"R{unit_price:.2f}",
+            f"R{quantity * unit_price:.2f}"
         ])
 
     table = Table(table_data, colWidths=[180, 70, 70, 70])
@@ -87,7 +98,7 @@ def generate_invoice_pdf(invoice, items, tenant_info=None, client_info=None, log
 
     # --- Total Section ---
     total_paragraph = Paragraph(
-        f"<b>Total: R{invoice['total_amount']:.2f}</b>", styles["Heading3"]
+        f"<b>Total: R{total_amount:.2f}</b>", styles["Heading3"]
     )
     elements.append(total_paragraph)
 

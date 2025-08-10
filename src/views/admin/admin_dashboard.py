@@ -1,216 +1,453 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+from datetime import datetime, timedelta
 from db.database import get_db_connection
+from utils.ui_helpers import loading_spinner, show_toast
 
 def admin_dashboard():
-    st.title("📊 Admin Dashboard – Tenant Overview")
+    """Admin dashboard with comprehensive tenant overview and management"""
+    # Page configuration
+    st.set_page_config(
+        page_title="Admin Dashboard",
+        layout="wide",
+        page_icon="📊"
+    )
+    
+    if 'tenant_id' not in st.session_state:
+        st.error("Access denied. Please log in as admin.")
+        st.stop()
 
-    tenant_id = st.session_state.get("tenant_id")
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    tenant_id = st.session_state.tenant_id
 
+    # Initialize session state for filters
+    if 'filter_user' not in st.session_state:
+        st.session_state.filter_user = "All"
+    if 'filter_date_range' not in st.session_state:
+        st.session_state.filter_date_range = [
+            datetime.now() - timedelta(days=30),
+            datetime.now()
+        ]
 
+    # Main dashboard layout
+    st.title(f"📊 Admin Dashboard – Tenant Overview")
+    st.markdown("---")
 
-    # --- Tabs Layout ---
-    usage_tab, invoices_tab, users_tab, alerts_tab = st.tabs([
-        "📦 Usage Summary", "🧾 Invoices", "👥 Users", "🔔 Alerts"
-    ])
+    # Database connection with loading spinner
+    with loading_spinner("Loading dashboard data..."):
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    with usage_tab:
-        # --- Filters ---
-        st.sidebar.subheader("🔍 Filters")
-        cursor.execute("SELECT DISTINCT user_id FROM usage_records WHERE tenant_id = ?", (tenant_id,))
-        user_options = [r[0] for r in cursor.fetchall()]
-        selected_user = st.sidebar.selectbox("Filter by User", ["All"] + user_options)
-        date_range = st.sidebar.date_input("Date Range", [])
-        metric_type = st.sidebar.text_input("Metric Type Filter")
-
-        query = """
-            SELECT usage_date, user_id, metric_name, usage_amount
-            FROM usage_records
-            WHERE tenant_id = ?
-        """
-        params = [tenant_id]
-        if selected_user != "All":
-            query += " AND user_id = ?"
-            params.append(selected_user)
-        if metric_type:
-            query += " AND metric_name LIKE ?"
-            params.append(f"%{metric_type}%")
-        if len(date_range) == 2:
-            query += " AND usage_date BETWEEN ? AND ?"
-            params.extend([date_range[0].isoformat(), date_range[1].isoformat()])
-
-        cursor.execute(query, tuple(params))
-        rows = cursor.fetchall()
-        df = pd.DataFrame(rows, columns=["Date", "User", "Metric", "Quantity"])
-        df["Date"] = pd.to_datetime(df["Date"])
-        df["Month"] = df["Date"].dt.to_period("M").astype(str)
-
-        st.subheader("📦 Usage Summary")
-        st.metric("📈 Total Usage", f"{df['Quantity'].sum()} units")
-
+        # --- Common Data Fetching ---
+        # Get all users for filters
         cursor.execute("""
-            SELECT included_units FROM subscriptions s
-            JOIN plans p ON s.plan_id = p.id
-            WHERE s.tenant_id = ? AND s.is_active = 1
+            SELECT id, username FROM users 
+            WHERE tenant_id = %s AND is_active = 1
+            ORDER BY username
+        """, (tenant_id,))
+        all_users = cursor.fetchall()
+        user_options = ["All"] + [f"{user[1]} (ID: {user[0]})" for user in all_users]
+
+        # Get current plan limits
+        cursor.execute("""
+            SELECT p.included_units FROM plans p
+            JOIN subscriptions s ON p.id = s.plan_id
+            WHERE s.tenant_id = %s AND s.is_active = TRUE
             LIMIT 1
         """, (tenant_id,))
         plan = cursor.fetchone()
         included_units = plan[0] if plan else 0
-        overage = max(0, df["Quantity"].sum() - included_units)
-        st.metric("🚨 Estimated Overage", f"{overage} units", delta_color="inverse")
 
-        monthly_usage = df.groupby(["Month", "User"])["Quantity"].sum().reset_index()
-        usage_chart = alt.Chart(monthly_usage).mark_line(point=True).encode(
-            x="Month:T", y="Quantity:Q", color="User:N",
-            tooltip=["Month", "User", "Quantity"]
-        ).properties(width=700, height=350)
-        st.altair_chart(usage_chart, use_container_width=True)
+        # --- Tabs Layout ---
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📊 Usage Analytics", 
+            "🧾 Billing & Invoices", 
+            "👥 User Management", 
+            "🚨 Alerts & Notifications"
+        ])
 
-        st.subheader("⬇️ Export Usage")
-        st.download_button("Download Filtered Usage CSV", df.to_csv(index=False), file_name="tenant_usage_export.csv", mime="text/csv")
+        with tab1:
+            # Usage Analytics Tab
+            st.subheader("Usage Analytics", divider="blue")
+            
+            # Filters sidebar
+            with st.sidebar:
+                st.subheader("🔍 Filters")
+                st.session_state.filter_user = st.selectbox(
+                    "Filter by User",
+                    user_options,
+                    index=user_options.index(st.session_state.filter_user)
+                )
+                st.session_state.filter_date_range = st.date_input(
+                    "Date Range",
+                    value=st.session_state.filter_date_range,
+                    max_value=datetime.now()
+                )
+                
+                metric_filter = st.text_input("Filter by Metric Name")
 
-        cursor.execute("""
-            SELECT COUNT(*) FROM payments p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.is_verified = 0 AND u.tenant_id = ?
-        """, (tenant_id,))
-        pending_count = cursor.fetchone()[0]
+            # Apply filters to data
+            user_filter = st.session_state.filter_user.split("(ID: ")[1][:-1] if st.session_state.filter_user != "All" else None
+            date_filter = st.session_state.filter_date_range if len(st.session_state.filter_date_range) == 2 else None
 
-        if pending_count > 0:
-            st.warning(f"🔔 You have {pending_count} payment(s) pending verification.")
-    
-        sidebar_title = "🛠️ Notifications"
-        if pending_count > 0:
-            sidebar_title += f" 🔴 ({pending_count})"
+            # Get usage data
+            query = """
+                SELECT 
+                    ur.usage_date,
+                    u.username,
+                    ur.metric_name,
+                    ur.usage_amount
+                FROM usage_records ur
+                JOIN users u ON ur.user_id = u.id
+                WHERE ur.tenant_id = %s
+            """
+            params = [tenant_id]
 
-        # st.sidebar.title(sidebar_title)
+            if user_filter:
+                query += " AND ur.user_id = %s"
+                params.append(user_filter)
+            if metric_filter:
+                query += " AND ur.metric_name ILIKE %s"
+                params.append(f"%{metric_filter}%")
+            if date_filter:
+                query += " AND ur.usage_date BETWEEN %s AND %s"
+                params.extend(date_filter)
 
-    with invoices_tab:
-        st.subheader("🧾 Invoice Status Overview")
-        cursor.execute("SELECT user_id, invoice_date, total_amount, is_paid FROM invoices WHERE tenant_id = ?", (tenant_id,))
-        invoices = cursor.fetchall()
+            query += " ORDER BY ur.usage_date DESC"
+            cursor.execute(query, tuple(params))
+            usage_data = cursor.fetchall()
 
-        if invoices:
-            inv_df = pd.DataFrame(invoices, columns=["User", "Date", "Amount", "Paid"])
-            inv_df["Date"] = pd.to_datetime(inv_df["Date"])
-            inv_df["Month"] = inv_df["Date"].dt.to_period("M").astype(str)
-            inv_df["Paid"] = inv_df["Paid"].apply(lambda x: "✅" if x else "❌")
-            st.dataframe(inv_df.sort_values("Date", ascending=False), use_container_width=True)
-
-            status_counts = inv_df["Paid"].value_counts().reset_index()
-            status_counts.columns = ["Status", "Count"]
-            chart = alt.Chart(status_counts).mark_bar().encode(
-                x="Status:N", y="Count:Q", color="Status:N"
-            )
-            st.altair_chart(chart, use_container_width=True)
-        else:
-            st.info("No invoices found for this tenant.")
-
-    with users_tab:
-        st.subheader("🧍 User Management")
-        cursor.execute("SELECT id, username, email, is_active FROM users WHERE tenant_id = ?", (tenant_id,))
-        user_rows = cursor.fetchall()
-        user_df = pd.DataFrame(user_rows, columns=["User ID", "Username", "Email", "Active"])
-        st.dataframe(user_df, use_container_width=True)
-
-        st.markdown("### 🔐 Reset User Password")
-        selected_user_id = st.selectbox("Select User", user_df["User ID"].tolist())
-        new_password = st.text_input("New Password", type="password")
-        if st.button("Reset Password"):
-            cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_password, selected_user_id))
-            conn.commit()
-            st.success(f"Password reset for user ID {selected_user_id}")
-
-        st.subheader("🔎 Detailed Usage by User")
-        user_to_analyze = st.selectbox("Select User to Analyze", user_options)
-        if user_to_analyze != "All":
-            cursor.execute("""
-                SELECT usage_date, metric_name, usage_amount
-                FROM usage_records
-                WHERE tenant_id = ? AND user_id = ?
-                ORDER BY usage_date DESC
-            """, (tenant_id, user_to_analyze))
-            usage_rows = cursor.fetchall()
-            if usage_rows:
-                detail_df = pd.DataFrame(usage_rows, columns=["Date", "Metric", "Quantity"])
-                detail_df["Date"] = pd.to_datetime(detail_df["Date"])
-                st.dataframe(detail_df, use_container_width=True)
-
-                heat_df = detail_df.copy()
-                heat_df["Day"] = heat_df["Date"].dt.date
-                pivot = heat_df.pivot_table(index="Day", columns="Metric", values="Quantity", aggfunc="sum").fillna(0)
-                st.write("📆 Heatmap of Daily Metric Usage")
-                st.dataframe(pivot)
-
-                chart_data = detail_df.groupby(["Date", "Metric"])["Quantity"].sum().reset_index()
-                usage_trend = alt.Chart(chart_data).mark_line(point=True).encode(
-                    x="Date:T", y="Quantity:Q", color="Metric:N",
-                    tooltip=["Date", "Metric", "Quantity"]
-                ).properties(title=f"📈 Usage Trend for {user_to_analyze}", height=350)
-                st.altair_chart(usage_trend, use_container_width=True)
+            if not usage_data:
+                st.info("No usage data found for selected filters")
             else:
-                st.info("No usage found for this user.")
+                # Create DataFrame
+                df = pd.DataFrame(usage_data, columns=["Date", "User", "Metric", "Quantity"])
+                df["Date"] = pd.to_datetime(df["Date"])
+                df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-    with alerts_tab:
-        st.subheader("🔔 Admin Notifications")
+                # Summary Metrics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Usage", f"{df['Quantity'].sum():,} units")
+                with col2:
+                    overage = max(0, df["Quantity"].sum() - included_units)
+                    st.metric("Estimated Overage", f"{overage:,} units", 
+                            delta_color="inverse" if overage > 0 else "normal")
+                with col3:
+                    st.metric("Unique Metrics", df["Metric"].nunique())
 
-        # 1. Overdue Invoices
-        st.markdown("### ❌ Overdue Invoices")
-        cursor.execute("""
-            SELECT u.username, i.id, i.due_date, i.total_amount
-            FROM invoices i
-            JOIN users u ON i.user_id = u.id
-            WHERE i.is_paid = 0 AND i.due_date < DATE('now') AND u.tenant_id = ?
-            ORDER BY i.due_date ASC
-        """, (tenant_id,))
-        overdue = cursor.fetchall()
-        if overdue:
-            for row in overdue:
-                st.warning(f"Client **{row[0]}** has overdue invoice #{row[1]} (Due: {row[2]}, R{row[3]:.2f})")
-        else:
-            st.success("✅ No overdue invoices.")
+                # Visualizations
+                st.subheader("Usage Trends", divider="gray")
+                
+                # Time series chart
+                trend_data = df.groupby(["Date", "Metric"])["Quantity"].sum().reset_index()
+                trend_chart = alt.Chart(trend_data).mark_area(opacity=0.7).encode(
+                    x="Date:T",
+                    y="Quantity:Q",
+                    color="Metric:N",
+                    tooltip=["Date", "Metric", "Quantity"]
+                ).properties(height=400)
+                st.altair_chart(trend_chart, use_container_width=True)
 
-        # 2. High Usage
-        st.markdown("### 🚨 High Usage Clients (>90%)")
-        cursor.execute("""
-            SELECT u.username, p.included_units, COALESCE(SUM(um.usage_amount), 0)
-            FROM users u
-            JOIN subscriptions s ON u.id = s.user_id AND s.is_active = 1
-            JOIN plans p ON s.plan_id = p.id
-            LEFT JOIN usage_records um ON u.id = um.user_id AND um.usage_date BETWEEN DATE('now', 'start of month') AND DATE('now')
-            WHERE u.tenant_id = ?
-            GROUP BY u.username, p.included_units
-            HAVING SUM(um.usage_amount) >= 0.9 * p.included_units
-        """, (tenant_id,))
-        alerts = cursor.fetchall()
-        if alerts:
-            for row in alerts:
-                pct = (row[2] / row[1]) * 100 if row[1] else 0
-                st.warning(f"Client **{row[0]}** has used {row[2]} of {row[1]} units (**{pct:.0f}%**) this month")
-        else:
-            st.success("✅ No high usage clients.")
+                # Top users chart
+                st.subheader("Usage by User", divider="gray")
+                user_data = df.groupby("User")["Quantity"].sum().reset_index().sort_values("Quantity", ascending=False)
+                user_chart = alt.Chart(user_data).mark_bar().encode(
+                    x="User:N",
+                    y="Quantity:Q",
+                    color=alt.Color("User:N", legend=None),
+                    tooltip=["User", "Quantity"]
+                ).properties(height=300)
+                st.altair_chart(user_chart, use_container_width=True)
 
-        # 3. Inactive Users
-        st.markdown("### 💤 Inactive Clients (No Usage This Month)")
+                # Export options
+                with st.expander("📤 Export Data"):
+                    st.download_button(
+                        "Download Usage Data (CSV)",
+                        df.to_csv(index=False),
+                        file_name=f"usage_data_{tenant_id}.csv",
+                        mime="text/csv"
+                    )
 
-        cursor.execute("""
-            SELECT u.username FROM users u
-            WHERE u.tenant_id = ? AND u.id NOT IN (
-                SELECT DISTINCT user_id FROM usage_records
-                WHERE usage_date BETWEEN DATE('now', 'start of month') AND DATE('now')
-                AND tenant_id = ?
-            )
-        """, (tenant_id, tenant_id))
-        inactive = cursor.fetchall()
+        with tab2:
+            # Billing & Invoices Tab
+            st.subheader("Billing Overview", divider="blue")
+            
+            # Invoice status summary
+            cursor.execute("""
+                SELECT 
+                    i.id,
+                    u.username,
+                    i.invoice_date,
+                    i.total_amount,
+                    i.is_paid,
+                    COALESCE(SUM(p.amount), 0) as paid_amount
+                FROM invoices i
+                JOIN users u ON i.user_id = u.id
+                LEFT JOIN payments p ON i.id = p.invoice_id
+                WHERE i.tenant_id = %s
+                GROUP BY i.id, u.username
+                ORDER BY i.invoice_date DESC
+                LIMIT 50
+            """, (tenant_id,))
+            invoices = cursor.fetchall()
 
-        if inactive:
-            for (username,) in inactive:
-                st.info(f"Client **{username}** has no usage this month")
-        else:
-            st.success("✅ All users have recorded usage this month")
+            if not invoices:
+                st.info("No invoices found for this tenant")
+            else:
+                # Create DataFrame
+                inv_df = pd.DataFrame(invoices, columns=[
+                    "ID", "User", "Date", "Total", "Paid", "Paid Amount"
+                ])
+                inv_df["Date"] = pd.to_datetime(inv_df["Date"])
+                inv_df["Status"] = inv_df.apply(
+                    lambda x: "✅ Paid" if x["Paid"] else "⚠️ Partial" if x["Paid Amount"] > 0 else "❌ Unpaid",
+                    axis=1
+                )
 
+                # Summary metrics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Invoices", len(inv_df))
+                with col2:
+                    paid_invoices = inv_df[inv_df["Paid"]].shape[0]
+                    st.metric("Paid Invoices", f"{paid_invoices} ({paid_invoices/len(inv_df):.0%})")
+                with col3:
+                    outstanding = inv_df[~inv_df["Paid"]]["Total"].sum()
+                    st.metric("Outstanding Amount", f"R{outstanding:,.2f}")
 
-    conn.close()
+                # Invoice table with filters
+                st.subheader("Invoice Details", divider="gray")
+                
+                status_filter = st.multiselect(
+                    "Filter by Status",
+                    options=["✅ Paid", "⚠️ Partial", "❌ Unpaid"],
+                    default=["✅ Paid", "⚠️ Partial", "❌ Unpaid"]
+                )
+                
+                filtered_df = inv_df[inv_df["Status"].isin(status_filter)]
+                st.dataframe(
+                    filtered_df[["ID", "User", "Date", "Total", "Paid Amount", "Status"]],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "ID": "Invoice #",
+                        "Date": st.column_config.DateColumn(),
+                        "Total": st.column_config.NumberColumn(format="R%.2f"),
+                        "Paid Amount": st.column_config.NumberColumn(format="R%.2f")
+                    }
+                )
+
+                # Visualizations
+                st.subheader("Payment Trends", divider="gray")
+                
+                # Payment status pie chart
+                status_counts = inv_df["Status"].value_counts().reset_index()
+                pie_chart = alt.Chart(status_counts).mark_arc().encode(
+                    theta="count:Q",
+                    color="Status:N",
+                    tooltip=["Status", "count"]
+                ).properties(height=300)
+                st.altair_chart(pie_chart, use_container_width=True)
+
+        with tab3:
+            # User Management Tab
+            st.subheader("User Management", divider="blue")
+            
+            # User table
+            cursor.execute("""
+                SELECT 
+                    id,
+                    username,
+                    email,
+                    is_active,
+                    last_login
+                FROM users
+                WHERE tenant_id = %s
+                ORDER BY username
+            """, (tenant_id,))
+            users = cursor.fetchall()
+            
+            if not users:
+                st.info("No users found for this tenant")
+            else:
+                user_df = pd.DataFrame(users, columns=[
+                    "ID", "Username", "Email", "Active", "Last Login"
+                ])
+                user_df["Last Login"] = pd.to_datetime(user_df["Last Login"])
+                
+                st.dataframe(
+                    user_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "ID": "User ID",
+                        "Active": st.column_config.CheckboxColumn(),
+                        "Last Login": st.column_config.DatetimeColumn()
+                    }
+                )
+
+                # User actions
+                st.subheader("User Actions", divider="gray")
+                
+                with st.expander("🔄 Reset Password"):
+                    selected_user = st.selectbox(
+                        "Select User",
+                        [f"{row[1]} (ID: {row[0]})" for row in users]
+                    )
+                    user_id = selected_user.split("(ID: ")[1][:-1]
+                    
+                    new_password = st.text_input("New Password", type="password")
+                    confirm_password = st.text_input("Confirm Password", type="password")
+                    
+                    if st.button("Reset Password", type="primary"):
+                        if new_password != confirm_password:
+                            st.error("Passwords do not match")
+                        elif len(new_password) < 8:
+                            st.error("Password must be at least 8 characters")
+                        else:
+                            cursor.execute(
+                                "UPDATE users SET password = %s WHERE id = %s",
+                                (new_password, user_id)
+                            )
+                            conn.commit()
+                            show_toast("Password reset successfully", "success")
+
+                with st.expander("📊 User Usage Report"):
+                    selected_user = st.selectbox(
+                        "Select User for Report",
+                        [f"{row[1]} (ID: {row[0]})" for row in users]
+                    )
+                    user_id = selected_user.split("(ID: ")[1][:-1]
+                    
+                    cursor.execute("""
+                        SELECT 
+                            usage_date,
+                            metric_name,
+                            usage_amount
+                        FROM usage_records
+                        WHERE user_id = %s
+                        ORDER BY usage_date DESC
+                        LIMIT 100
+                    """, (user_id,))
+                    user_usage = cursor.fetchall()
+                    
+                    if user_usage:
+                        usage_df = pd.DataFrame(user_usage, columns=["Date", "Metric", "Quantity"])
+                        st.dataframe(usage_df, use_container_width=True)
+                        
+                        # Usage heatmap
+                        heat_df = usage_df.copy()
+                        heat_df["Date"] = pd.to_datetime(heat_df["Date"])
+                        heat_df["Day"] = heat_df["Date"].dt.date
+                        pivot = heat_df.pivot_table(
+                            index="Day",
+                            columns="Metric",
+                            values="Quantity",
+                            aggfunc="sum"
+                        ).fillna(0)
+                        
+                        st.subheader("Daily Usage Heatmap")
+                        st.dataframe(pivot.style.background_gradient(cmap="YlOrRd"), use_container_width=True)
+                    else:
+                        st.info("No usage data found for this user")
+
+        with tab4:
+            # Alerts & Notifications Tab
+            st.subheader("Alerts Dashboard", divider="blue")
+            
+            # Overdue invoices
+            with st.expander("❌ Overdue Invoices", expanded=True):
+                cursor.execute("""
+                    SELECT 
+                        i.id,
+                        u.username,
+                        i.due_date,
+                        i.total_amount,
+                        i.invoice_date
+                    FROM invoices i
+                    JOIN users u ON i.user_id = u.id
+                    WHERE i.is_paid = FALSE 
+                    AND i.due_date < CURRENT_DATE
+                    AND u.tenant_id = %s
+                    ORDER BY i.due_date ASC
+                """, (tenant_id,))
+                overdue = cursor.fetchall()
+                
+                if overdue:
+                    for inv_id, username, due_date, amount, inv_date in overdue:
+                        days_overdue = (datetime.now().date() - due_date).days
+                        with st.container(border=True):
+                            st.markdown(f"""
+                                **Invoice #{inv_id}**  
+                                **Client:** {username}  
+                                **Amount Due:** R{amount:,.2f}  
+                                **Due Date:** {due_date} ({days_overdue} days overdue)  
+                                **Issued:** {inv_date}
+                            """)
+                else:
+                    st.success("✅ No overdue invoices")
+
+            # High usage alerts
+            with st.expander("🚨 High Usage Clients (>90%)", expanded=True):
+                cursor.execute("""
+                    SELECT 
+                        u.username,
+                        p.included_units,
+                        COALESCE(SUM(ur.usage_amount), 0) as usage
+                    FROM users u
+                    JOIN subscriptions s ON u.id = s.user_id AND s.is_active
+                    JOIN plans p ON s.plan_id = p.id
+                    LEFT JOIN usage_records ur ON u.id = ur.user_id 
+                        AND ur.usage_date BETWEEN date_trunc('month', CURRENT_DATE) AND CURRENT_DATE
+                    WHERE u.tenant_id = %s
+                    GROUP BY u.username, p.included_units
+                    HAVING SUM(ur.usage_amount) >= 0.9 * p.included_units
+                """, (tenant_id,))
+                high_usage = cursor.fetchall()
+                
+                if high_usage:
+                    for username, limit, usage in high_usage:
+                        pct = (usage / limit) * 100
+                        with st.container(border=True):
+                            st.markdown(f"""
+                                **Client:** {username}  
+                                **Usage:** {usage:,.0f} of {limit:,.0f} units ({pct:.0f}%)  
+                                **Overage:** {max(0, usage - limit):,.0f} units
+                            """)
+                else:
+                    st.success("✅ No high usage clients")
+
+            # Inactive users
+            with st.expander("💤 Inactive Users (No Recent Usage)", expanded=True):
+                cursor.execute("""
+                    SELECT u.username, MAX(ur.usage_date) as last_usage
+                    FROM users u
+                    LEFT JOIN usage_records ur ON u.id = ur.user_id
+                    WHERE u.tenant_id = %s
+                    GROUP BY u.username
+                    HAVING MAX(ur.usage_date) IS NULL OR MAX(ur.usage_date) < CURRENT_DATE - INTERVAL '30 days'
+                """, (tenant_id,))
+                inactive = cursor.fetchall()
+                
+                if inactive:
+                    for username, last_usage in inactive:
+                        with st.container(border=True):
+                            if last_usage:
+                                days_inactive = (datetime.now().date() - last_usage).days
+                                st.markdown(f"""
+                                    **Client:** {username}  
+                                    **Last Activity:** {last_usage} ({days_inactive} days ago)
+                                """)
+                            else:
+                                st.markdown(f"""
+                                    **Client:** {username}  
+                                    **Last Activity:** Never
+                                """)
+                else:
+                    st.success("✅ All users have recent activity")
+
+        conn.close()
+
+# if __name__ == "__main__":
+#     admin_dashboard()

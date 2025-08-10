@@ -29,14 +29,14 @@ def usage_dashboard():
         cursor.execute("""
             SELECT user_id, metric_type, quantity, usage_date
             FROM usage_metrics
-            WHERE tenant_id = ?
+            WHERE tenant_id = %s
         """, (tenant_id,))
     else:
         cursor.execute("""
             SELECT user_id, metric_type, quantity, usage_date
             FROM usage_metrics
-            WHERE tenant_id = ? AND user_id = (
-                SELECT id FROM users WHERE username = ?
+            WHERE tenant_id = %s AND user_id = (
+                SELECT id FROM users WHERE username = %s
             )
         """, (tenant_id, username))
 
@@ -116,7 +116,7 @@ def usage_heatmap():
     df = pd.read_sql_query("""
         SELECT usage_date, metric_type, metric_subtype, SUM(quantity) AS total
         FROM usage_metrics
-        WHERE user_id = ?
+        WHERE user_id = %s
         GROUP BY usage_date, metric_type, metric_subtype
     """, conn, params=(user_id,))
     conn.close()

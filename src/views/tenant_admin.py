@@ -22,7 +22,7 @@ def manage_tenants():
         if submitted:
             try:
                 cursor.execute(
-                    "INSERT INTO tenants (id, name, industry) VALUES (?, ?, ?)",
+                    "INSERT INTO tenants (id, name, industry) VALUES (%s, %s, %s)",
                     (tenant_id, name, industry)
                 )
                 conn.commit()

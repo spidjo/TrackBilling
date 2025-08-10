@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def get_user_email(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT email FROM users WHERE id = ?", (user_id,))
+    cursor.execute("SELECT email FROM users WHERE id = %s", (user_id,))
     row = cursor.fetchone()
     conn.close()
     return row[0] if row else None
@@ -32,27 +32,27 @@ def record_usage(user_id, tenant_id, metric_type, metric_subtype, quantity):
         # Insert into usage_metrics
         cursor.execute("""
             INSERT INTO usage_metrics (tenant_id, user_id, metric_type, metric_subtype, quantity, usage_date)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (tenant_id, user_id, metric_type, metric_subtype, quantity, usage_date))
         logger.info(f"📥 Usage recorded: user={user_id}, metric={metric_type}, qty={quantity}")
 
         # Upsert into usage_aggregates
         cursor.execute("""
             SELECT total_quantity FROM usage_aggregates
-            WHERE tenant_id = ? AND user_id = ? AND metric_type = ? AND metric_subtype = ? AND period = ?
+            WHERE tenant_id = %s AND user_id = %s AND metric_type = %s AND metric_subtype = %s AND period = %s
         """, (tenant_id, user_id, metric_type, metric_subtype, usage_period))
         row = cursor.fetchone()
 
         if row:
             cursor.execute("""
                 UPDATE usage_aggregates
-                SET total_quantity = total_quantity + ?
-                WHERE tenant_id = ? AND user_id = ? AND metric_type = ? AND metric_subtype = ? AND period = ?
+                SET total_quantity = total_quantity + %s
+                WHERE tenant_id = %s AND user_id = %s AND metric_type = %s AND metric_subtype = %s AND period = %s
             """, (quantity, tenant_id, user_id, metric_type, metric_subtype, usage_period))
         else:
             cursor.execute("""
                 INSERT INTO usage_aggregates (tenant_id, user_id, metric_type, metric_subtype, period, total_quantity)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (tenant_id, user_id, metric_type, metric_subtype, usage_period, quantity))
 
         conn.commit()

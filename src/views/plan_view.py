@@ -26,7 +26,7 @@ def manage_plans():
         if st.form_submit_button("Add Plan"):
             cursor.execute("""
                 INSERT INTO plans (name, monthly_fee, included_usage, overage_rate, tenant_id)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
             """, (name, monthly_fee, included_usage, overage_rate, tenant_id))
             conn.commit()
             st.success("Plan added.")

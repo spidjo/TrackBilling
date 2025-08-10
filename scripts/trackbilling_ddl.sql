@@ -1,21 +1,4 @@
-
-import psycopg2
-
-
-def get_db_connection():
-    return psycopg2.connect(
-        dbname="billing_db",
-        user="postgres",
-        password="admin",
-        host="localhost",
-        options="-c client_encoding=utf8 -c bytea_output=escape"
-    )
- 
-conn = get_db_connection()
-cursor = conn.cursor()   
-cursor.execute("""
-        -- Tenants Table
-        CREATE TABLE IF NOT EXISTS tenants (
+CREATE TABLE IF NOT EXISTS tenants (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             company_name TEXT,
@@ -24,7 +7,6 @@ cursor.execute("""
             region TEXT,
             phone TEXT,
             industry TEXT,
-            logo_url TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -43,8 +25,7 @@ cursor.execute("""
             is_active BOOLEAN DEFAULT TRUE,
             verification_token TEXT,
             last_verification_sent TIMESTAMP,
-            is_verified BOOLEAN DEFAULT FALSE,
-            last_login TIMESTAMP
+            is_verified BOOLEAN DEFAULT FALSE
         );
 
         -- Plans Table
@@ -56,9 +37,7 @@ cursor.execute("""
             monthly_fee NUMERIC NOT NULL,
             included_units INTEGER DEFAULT 0,
             overage_rate NUMERIC DEFAULT 0.0,
-            is_active BOOLEAN DEFAULT TRUE,
-            billing_cycle TEXT NOT NULL DEFAULT 'monthly',
-            start_date DATE NOT NULL DEFAULT CURRENT_DATE
+            is_active BOOLEAN DEFAULT TRUE
         );
 
         CREATE TABLE IF NOT EXISTS plan_metrics (
@@ -125,12 +104,8 @@ cursor.execute("""
             period_end DATE NOT NULL,
             invoice_date DATE DEFAULT CURRENT_DATE,
             total_amount NUMERIC NOT NULL,
-            subtotal NUMERIC NOT NULL,
-            tax_amount NUMERIC NOT NULL,
-            notes TEXT,
             is_paid BOOLEAN DEFAULT FALSE,
             due_date DATE DEFAULT (CURRENT_DATE + INTERVAL '30 days'),
-            pdf_generated BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -208,27 +183,3 @@ cursor.execute("""
             comment TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-
-        CREATE TABLE IF NOT EXISTS password_resets (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER,
-            email TEXT,
-            token TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_used BOOLEAN DEFAULT FALSE,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        );
-        CREATE INDEX idx_invoices_user_id ON invoices(user_id);
-        CREATE INDEX idx_invoices_tenant_id ON invoices(tenant_id);
-        CREATE INDEX idx_invoice_items_invoice_id ON invoice_items(invoice_id);
-    """)
-conn.commit()
-
-
-conn.close()
-
-print("✅ Billing schema initialized successfully.")
-
-
-# if __name__ == "__main__":
-#     init_billing_schema()

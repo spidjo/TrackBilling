@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+            background-color: #f7f7f7;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #eeeeee;
+        }
+        .logo {
+            max-height: 50px;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .success-icon {
+            color: #4CAF50;
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-top: 0;
+            text-align: center;
+        }
+        .invoice-details {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #555555;
+        }
+        .detail-value {
+            color: #2c3e50;
+        }
+        .amount {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #999999;
+            border-top: 1px solid #eeeeee;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white !important;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 20px auto;
+            text-align: center;
+        }
+        .support {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #666666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://example.com/logo.png" alt="{{ tenant_name }} Logo" class="logo">
+        </div>
+        
+        <div class="content">
+            <div class="success-icon">✓</div>
+            <h1>Payment Verified</h1>
+            
+            <p>Hello {{ username }},</p>
+            <p>Your payment has been successfully processed and verified by our team. Below are the details of your transaction:</p>
+            
+            <div class="invoice-details">
+                <div class="amount">R{{ "%.2f"|format(amount) }}</div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Invoice Number:</span>
+                    <span class="detail-value">#{{ invoice_id }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Payment Date:</span>
+                    <span class="detail-value">{{ invoice_date }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Payment Status:</span>
+                    <span class="detail-value" style="color: #4CAF50; font-weight: bold;">Verified</span>
+                </div>
+            </div>
+            
+            <p style="text-align: center;">
+                <a href="{{ app_url }}/invoices/{{ invoice_id }}" class="button">View Invoice</a>
+            </p>
+            
+            <p>Thank you for your payment. This transaction will appear on your billing statement as <strong>{{ tenant_name }}</strong>.</p>
+            
+            <div class="support">
+                <p>Need help or have questions? Contact our support team at <a href="mailto:support@example.com">support@example.com</a></p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; {{ year }} {{ tenant_name }}. All rights reserved.</p>
+            <p>
+                <a href="{{ app_url }}/privacy">Privacy Policy</a> | 
+                <a href="{{ app_url }}/terms">Terms of Service</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

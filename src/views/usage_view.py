@@ -16,7 +16,7 @@ def log_usage():
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO usage_records (user_id, usage_amount, usage_type, timestamp, tenant_id)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         """, (
             st.session_state.username,
             usage_amount,
@@ -34,7 +34,7 @@ def log_usage():
     cursor = conn.cursor()
     rows = cursor.execute("""
         SELECT usage_amount, usage_type, timestamp FROM usage_records
-        WHERE user_id = ? AND tenant_id = ?
+        WHERE user_id = %s AND tenant_id = %s
         ORDER BY timestamp DESC LIMIT 10
     """, (st.session_state.username, tenant_id)).fetchall()
     for amt, typ, ts in rows:

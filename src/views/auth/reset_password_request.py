@@ -1,51 +1,64 @@
-
-
 import streamlit as st
 import secrets
-import smtplib
-from email.message import EmailMessage
 from db.database import get_db_connection
-from datetime import datetime
 from utils.email_utils import send_password_reset_email
+from utils.ui_helpers import show_toast
 
 def reset_password_request():
-    st.title("🔑 Reset Your Password")
+    st.title("🔑 Password Recovery")
+    
+    with st.form("reset_request_form"):
+        st.markdown("Enter your email address to receive a password reset link")
+        email = st.text_input("Email Address", placeholder="your@email.com")
+        
+        if st.form_submit_button("Send Reset Link"):
+            handle_reset_request(email)
 
-    email_input = st.text_input("Enter your account email")
-
-    if st.button("Send Reset Link"):
+def handle_reset_request(email):
+    conn = None
+    try:
         conn = get_db_connection()
         cursor = conn.cursor()
-
-        cursor.execute("SELECT id FROM users WHERE email = ?", (email_input,))
+        
+        # Check if user exists
+        cursor.execute("""
+            SELECT id, username FROM users 
+            WHERE email = %s
+        """, (email,))
         user = cursor.fetchone()
-
-        if user:
-            user_id = user[0]
-            token = secrets.token_urlsafe(32)
-
-            cursor.execute("""
-                INSERT INTO password_resets (user_id, email, token)
-                VALUES (?, ?, ?)
-            """, (user_id, email_input, token))
-            conn.commit()
-
-            # Get username fron users table
-            cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
-            username = cursor.fetchone()[0]
+        
+        if not user:
+            show_toast("Email not found", "error")
+            return
             
-            reset_link = f"http://localhost:8501/reset_password?token={token}"
-            
-
-            # Send email (replace with real email sending)
-            try:
-                send_password_reset_email(to_email=email_input, username=username, token=token)
-                
-            except Exception as e:
-                st.warning("⚠️ Email sending failed. Use the link below:")
-                st.code(reset_link)
-
-        else:
-            st.error("❌ Email not found.")
-
-        conn.close()
+        user_id, username = user
+        token = secrets.token_urlsafe(32)
+        
+        # Delete any existing tokens for this user
+        cursor.execute("""
+            DELETE FROM password_resets 
+            WHERE user_id = %s
+        """, (user_id,))
+        
+        # Insert new token
+        cursor.execute("""
+            INSERT INTO password_resets (user_id, email, token)
+            VALUES (%s, %s, %s)
+        """, (user_id, email, token))
+        
+        conn.commit()
+        
+        # Send email (in production this would be async)
+        send_password_reset_email(
+            to_email=email,
+            username=username,
+            token=token
+        )
+        
+        show_toast("Reset link sent to your email", "success")
+        
+    except Exception as e:
+        if conn: conn.rollback()
+        show_toast(f"Error: {str(e)}", "error")
+    finally:
+        if conn: conn.close()
