@@ -155,3 +155,4 @@ echo "✅ Deployment & auto-update setup completed!"
 echo "Landing page: https://$DOMAIN"
 echo "App: https://$APP_SUBDOMAIN"
 echo "Auto-update cron job running every hour"
+
