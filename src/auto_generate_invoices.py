@@ -1,125 +1,233 @@
-# auto_generate_invoices.py
-from datetime import datetime, date
+# src/auto_generate_invoices.py
+import logging
+from datetime import date, datetime
+from typing import Dict, List, Optional, Tuple
+from contextlib import contextmanager
+from decimal import Decimal
 from dateutil.relativedelta import relativedelta
-from db.database import get_db_connection
 
-def auto_generate_invoices():
+logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def database_connection():
+    """Context manager for database connections with automatic cleanup."""
+    from db.database import get_db_connection
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
- 
-        today = date.today()
-        period_start = today.replace(day=1)
-        period_end = today
-
-        # Get all active subscriptions
-        cursor.execute("""
-            SELECT s.id, s.user_id, s.plan_id, s.tenant_id, p.monthly_fee
-            FROM subscriptions s
-            JOIN plans p ON s.plan_id = p.id
-            WHERE s.is_active
-        """)
-        subscriptions = cursor.fetchall()
-
-        results = {
-            "success": False,
-            "count": 0,
-            "errors": []
-        }
-
-        for sub_id, user_id, plan_id, tenant_id, monthly_fee in subscriptions:
-            try:
-                # Start transaction
-                conn.autocommit = False
-
-                # Fetch plan metric limits
-                cursor.execute("""
-                    SELECT pm.id, pm.metric_name, pml.included_units, pml.overage_rate
-                    FROM plan_metric_limits pml
-                    JOIN plan_metrics pm ON pml.metric_id = pm.id
-                    WHERE pml.plan_id = %s
-                """, (plan_id,))
-                metric_limits = cursor.fetchall()
-
-                total_amount = monthly_fee
-                invoice_items = []
-
-                # Add base monthly fee
-                invoice_items.append({
-                    "description": "Monthly Subscription Fee",
-                    "quantity": 1,
-                    "unit_price": monthly_fee,
-                    "total_price": monthly_fee
-                })
-
-                # Calculate overages
-                for metric_id, metric_name, included_units, overage_rate in metric_limits:
-                    cursor.execute("""
-                        SELECT COALESCE(SUM(usage_amount), 0)
-                        FROM usage_records
-                        WHERE user_id = %s AND metric_id = %s
-                        AND usage_date BETWEEN %s AND %s
-                    """, (user_id, metric_id, period_start, period_end))
-                    usage = cursor.fetchone()[0]
-
-                    if usage > included_units:
-                        overage = usage - included_units
-                        overage_total = overage * overage_rate
-                        total_amount += overage_total
-
-                        invoice_items.append({
-                            "description": f"Overage: {metric_name}",
-                            "quantity": overage,
-                            "unit_price": overage_rate,
-                            "total_price": overage_total
-                        })
-
-                # Create invoice
-                cursor.execute("""
-                    INSERT INTO invoices (tenant_id, user_id, period_start, period_end, total_amount)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id
-                """, (tenant_id, user_id, period_start, period_end, total_amount))
-                
-                invoice_row = cursor.fetchone()
-                if not invoice_row:
-                    raise Exception("Failed to create invoice record")
-                
-                invoice_id = invoice_row[0]
-
-                # Create invoice items
-                for item in invoice_items:
-                    cursor.execute("""
-                        INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total_price)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (
-                        invoice_id,
-                        item["description"],
-                        item["quantity"],
-                        item["unit_price"],
-                        item["total_price"]
-                    ))
-
-                # Commit transaction
-                conn.commit()
-                results["count"] += 1
-                print(f"✅ Invoice generated for user_id {user_id} (Invoice #{invoice_id})")
-
-            except Exception as e:
-                conn.rollback()
-                error_msg = f"Failed to generate invoice for user {user_id}: {str(e)}"
-                results["errors"].append(error_msg)
-                print(f"❌ {error_msg}")
-                continue
-
-        results["success"] = True if results["count"] > 0 else False
-        return results
-
+        conn.autocommit = False
+        yield conn
     except Exception as e:
+        logger.error(f"Database connection error: {str(e)}", exc_info=True)
         if conn:
             conn.rollback()
-        raise e
+        raise
     finally:
         if conn:
             conn.close()
+
+
+class InvoiceGenerator:
+    """Handles automatic generation of invoices using BillingEngine."""
+
+    BATCH_SIZE = 100
+
+    def __init__(self, billing_date: Optional[date] = None):
+        """
+        Initialize invoice generator.
+        
+        Args:
+            billing_date: Optional date to use for billing period (defaults to 1st of previous month)
+        """
+        print("Initializing InvoiceGenerator...")
+        from billing_engine import BillingEngine
+        self.billing_engine = BillingEngine()
+        
+        # Set billing_date to 1st day of previous month if not provided
+        if billing_date is None:
+            today = date.today()
+            first_day_of_current_month = today.replace(day=1)
+            self.billing_date = first_day_of_current_month #- relativedelta(months=1)
+        else:
+            self.billing_date = billing_date
+            
+        self.billing_period = self.billing_date.strftime("%Y-%m")
+        self.results = {
+            "success": False,
+            "count": 0,
+            "errors": [],
+            "warnings": []
+        }
+
+    def generate_invoices(self) -> Dict[str, any]:
+        """Main entry point for invoice generation with duplicate prevention."""
+        try:
+            # First check if we've already processed this billing period
+            if self._is_period_processed():
+                logger.info(f"Invoices already generated for period {self.billing_period}")
+                return {
+                    "success": True,
+                    "count": 0,
+                    "errors": [],
+                    "warnings": [f"Invoices already generated for {self.billing_period}"]
+                }
+
+            logger.info(f"Starting invoice generation for period {self.billing_period} (billing date: {self.billing_date})")
+            self._process_tenants()
+            self.results["success"] = self.results["count"] > 0 or not self.results["errors"]
+            
+            # Mark period as processed if successful
+            if self.results["success"]:
+                self._mark_period_processed()
+                
+            return self.results
+        except Exception as e:
+            error_msg = f"Critical error in invoice generation: {str(e)}"
+            logger.critical(error_msg, exc_info=True)
+            self.results["errors"].append(error_msg)
+            self.results["success"] = False
+            return self.results
+
+    def _is_period_processed(self) -> bool:
+        """Check if this billing period has already been processed."""
+        with database_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 1 FROM invoice_generation_log
+                WHERE period = %s
+                AND status = 'completed'
+                LIMIT 1
+            """, (self.billing_period,))
+            return cursor.fetchone() is not None
+
+    def _mark_period_processed(self):
+        """Mark this billing period as processed in the log."""
+        with database_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                # First try to update existing record
+                cursor.execute("""
+                    UPDATE invoice_generation_log
+                    SET 
+                        generated_at = %s,
+                        invoice_count = %s,
+                        status = %s
+                    WHERE period = %s
+                """, (
+                    datetime.now(),
+                    self.results["count"],
+                    "completed",
+                    self.billing_period
+                ))
+                
+                # If no rows were updated, insert new record
+                if cursor.rowcount == 0:
+                    cursor.execute("""
+                        INSERT INTO invoice_generation_log (
+                            period, 
+                            generated_at, 
+                            invoice_count,
+                            status
+                        )
+                        VALUES (%s, %s, %s, %s)
+                    """, (
+                        self.billing_period,
+                        datetime.now(),
+                        self.results["count"],
+                        "completed"
+                    ))
+                
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise
+            
+    def _process_tenants(self):
+        """Process all active tenants in batches."""
+        processed = 0
+        while True:
+            try:
+                with database_connection() as conn:
+                    tenants = self._fetch_tenant_batch(conn, processed)
+                    if not tenants:
+                        break
+
+                    for tenant in tenants:
+                        self._process_single_tenant(tenant[0])
+
+                    processed += len(tenants)
+                    logger.debug(f"Processed batch of {len(tenants)} tenants")
+
+            except Exception as e:
+                error_msg = f"Batch processing failed at offset {processed}: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                self.results["errors"].append(error_msg)
+                if processed + self.BATCH_SIZE > 1000:  # Safety limit
+                    break
+                continue
+
+    def _fetch_tenant_batch(self, conn, offset: int) -> List[Tuple]:
+        """Fetch a batch of active tenants that should be billed."""
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id FROM tenants
+            WHERE is_active = TRUE
+            ORDER BY id
+            LIMIT %s OFFSET %s
+        """, (self.BATCH_SIZE, offset))
+        return cursor.fetchall()
+
+    def _process_single_tenant(self, tenant_id: int):
+        """Process a single tenant and generate invoices."""
+        try:
+            logger.info(f"Generating invoices for tenant {tenant_id}")
+            generated_ids = self.billing_engine.generate_invoices(
+                tenant_id=tenant_id,
+                billing_period=self.billing_period
+            )
+            
+            if generated_ids:
+                self.results["count"] += len(generated_ids)
+                logger.info(f"Generated {len(generated_ids)} invoices for tenant {tenant_id}")
+            else:
+                logger.info(f"No invoices generated for tenant {tenant_id}")
+
+        except Exception as e:
+            error_msg = f"Failed to process tenant {tenant_id}: {str(e)}"
+            self.results["errors"].append(error_msg)
+            logger.error(error_msg, exc_info=True)
+
+
+def auto_generate_invoices(billing_date: Optional[date] = None) -> Dict[str, any]:
+    """
+    Automatically generates invoices for all active subscriptions in all tenants.
+    
+    Args:
+        billing_date: Optional date to use for billing (defaults to 1st of previous month)
+    
+    Returns:
+        dict: {
+            "success": bool (True if no critical errors),
+            "count": int (number of invoices generated),
+            "errors": list[str] (error messages),
+            "warnings": list[str] (non-critical issues)
+        }
+    """
+    logger.info("Starting automatic invoice generation")
+    try:
+        generator = InvoiceGenerator(billing_date)
+        result = generator.generate_invoices()
+        logger.info(
+            f"Invoice generation completed. Generated {result['count']} invoices. "
+            f"Errors: {len(result['errors'])}, Warnings: {len(result['warnings'])}"
+        )
+        return result
+    except Exception as e:
+        logger.critical(f"Fatal error in invoice generation: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "count": 0,
+            "errors": [f"Fatal error: {str(e)}"],
+            "warnings": []
+        }

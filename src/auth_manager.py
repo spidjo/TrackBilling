@@ -1,3 +1,4 @@
+# src/auth_manager.py
 import bcrypt
 import psycopg2
 import psycopg2.extras
@@ -9,8 +10,7 @@ from functools import lru_cache
 from db.database import get_db_connection
 from utils.email_service import send_verification_email
 
-# Cache password hashing to prevent timing attacks
-@lru_cache(maxsize=128)
+
 def get_hashed_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode('utf-8')
 
@@ -27,7 +27,7 @@ def is_strong_password(password: str) -> bool:
 def register_user(username, password, email, first_name, last_name, company, tenant_id):
     try:
         # Validate email format
-        validated_email = validate_email(email).email
+        validated_email = validate_email(email).email.lower()
         
         # Validate password strength
         if not is_strong_password(password):
@@ -47,8 +47,8 @@ def register_user(username, password, email, first_name, last_name, company, ten
             
             cursor.execute("""
                 INSERT INTO users 
-                (username, password, first_name, last_name, company_name, email, verification_token, tenant_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (username, password, first_name, last_name, company_name, email, verification_token, tenant_id, token_timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
                 RETURNING id
             """, (username, hashed_pw, first_name, last_name, company, validated_email, token, tenant_id))
             
@@ -94,23 +94,23 @@ def authenticate_user(username: str, password: str) -> tuple:
         
         user = cursor.fetchone()
         if not user:
-            return False, None, None
-            
+            return False, None, None, None
+
         user_id, stored_pw, role, is_verified, tenant_id = user
         
         # Check password
         if not bcrypt.checkpw(password.encode(), stored_pw.encode()):
-            return False, None, None
+            return False, None, None, None
             
         # Check verification status
         if not is_verified:
-            return "unverified", None, None
+            return "unverified", None, None, None
             
-        return True, role, tenant_id
+        return True, role, tenant_id, user_id
         
     except Exception as e:
         print(f"Authentication error: {str(e)}")
-        return False, None, None
+        return False, None, None, None
     finally:
         if conn: conn.close()
 
@@ -125,6 +125,8 @@ def verify_token(token: str) -> dict:
         cursor.execute("""
             SELECT id FROM users 
             WHERE verification_token = %s
+                AND is_verified = 0
+                AND token_timestamp > NOW() - INTERVAL '1 hour'
         """, (token,))
         
         user = cursor.fetchone()

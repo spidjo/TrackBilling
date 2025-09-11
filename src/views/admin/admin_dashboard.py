@@ -1,15 +1,113 @@
 import streamlit as st
 import pandas as pd
-import altair as alt
+import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from db.database import get_db_connection
 from utils.ui_helpers import loading_spinner, show_toast
+from utils.session import init_session_state, validate_session
+
+# Custom CSS for professional styling
+st.markdown("""
+<style>
+    :root {
+        --primary: #4F46E5;
+        --secondary: #10B981;
+        --danger: #EF4444;
+        --warning: #F59E0B;
+        --info: #3B82F6;
+        --dark: #1F2937;
+        --light: #F9FAFB;
+    }
+    
+    .metric-card {
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        background-color: white;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+        transition: all 0.3s ease;
+        border-top: 4px solid;
+    }
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+    .metric-positive {
+        border-top-color: var(--secondary);
+    }
+    .metric-neutral {
+        border-top-color: var(--info);
+    }
+    .metric-negative {
+        border-top-color: var(--danger);
+    }
+    .metric-warning {
+        border-top-color: var(--warning);
+    }
+    
+    .alert-card {
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin: 1rem 0;
+        background-color: white;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+        border-left: 4px solid;
+    }
+    .alert-danger {
+        border-left-color: var(--danger);
+        background-color: #FEE2E2;
+    }
+    .alert-warning {
+        border-left-color: var(--warning);
+        background-color: #FEF3C7;
+    }
+    .alert-info {
+        border-left-color: var(--info);
+        background-color: #DBEAFE;
+    }
+    .alert-success {
+        border-left-color: var(--secondary);
+        background-color: #D1FAE5;
+    }
+    
+    .section-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    .section-header h2 {
+        color: #1F2937;
+        font-weight: 700;
+        margin: 0;
+    }
+    .section-header .icon {
+        margin-right: 0.75rem;
+        font-size: 1.5rem;
+    }
+    
+    .custom-divider {
+        height: 1px;
+        background: linear-gradient(90deg, rgba(79,70,229,0.1) 0%, rgba(79,70,229,0.5) 50%, rgba(79,70,229,0.1) 100%);
+        margin: 1.5rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+def format_currency(value):
+    """Format currency values consistently"""
+    return f"R{float(value):,.2f}" if value else "R0.00"
 
 def admin_dashboard():
-    """Admin dashboard with comprehensive tenant overview and management"""
+    """Enhanced Tenant Admin Dashboard with professional UX"""
+    init_session_state()
+    if not validate_session():
+        st.warning("🔒 Your session has expired. Please log in again.")
+        st.stop()
+        
     # Page configuration
     st.set_page_config(
-        page_title="Admin Dashboard",
+        page_title="Tenant Admin Dashboard",
         layout="wide",
         page_icon="📊"
     )
@@ -29,9 +127,18 @@ def admin_dashboard():
             datetime.now()
         ]
 
-    # Main dashboard layout
-    st.title(f"📊 Admin Dashboard – Tenant Overview")
-    st.markdown("---")
+    # Dashboard header
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; margin-bottom: 1.5rem;">
+        <h1 style="margin: 0; color: #1F2937;">📊 Tenant Admin Dashboard</h1>
+        <div style="margin-left: auto; display: flex; align-items: center;">
+            <span style="margin-right: 1rem; color: #6B7280;">Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</span>
+            <button style="background-color: #4F46E5; color: white; border: none; border-radius: 8px; padding: 0.5rem 1rem; cursor: pointer;">Refresh Data</button>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
 
     # Database connection with loading spinner
     with loading_spinner("Loading dashboard data..."):
@@ -50,13 +157,83 @@ def admin_dashboard():
 
         # Get current plan limits
         cursor.execute("""
-            SELECT p.included_units FROM plans p
+            SELECT p.name, p.included_units FROM plans p
             JOIN subscriptions s ON p.id = s.plan_id
             WHERE s.tenant_id = %s AND s.is_active = TRUE
             LIMIT 1
         """, (tenant_id,))
         plan = cursor.fetchone()
-        included_units = plan[0] if plan else 0
+        plan_name = plan[0] if plan else "No active plan"
+        included_units = plan[1] if plan else 0
+
+        # Get tenant name
+        cursor.execute("SELECT name FROM tenants WHERE id = %s", (tenant_id,))
+        tenant_name = cursor.fetchone()[0]
+
+        # --- Summary Metrics ---
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            cursor.execute("""
+                SELECT COUNT(*) FROM users 
+                WHERE tenant_id = %s AND is_active = 1
+            """, (tenant_id,))
+            active_users = cursor.fetchone()[0]
+            st.markdown(f"""
+            <div class="metric-card metric-positive">
+                <h3>Active Users</h3>
+                <h2>{active_users:,}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            cursor.execute("""
+                SELECT COALESCE(SUM(total_invoiced), 0) 
+                FROM invoices 
+                WHERE tenant_id = %s AND is_paid = FALSE
+            """, (tenant_id,))
+            outstanding = cursor.fetchone()[0]
+            st.markdown(f"""
+            <div class="metric-card metric-negative">
+                <h3>Outstanding Balance</h3>
+                <h2>{format_currency(outstanding)}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            cursor.execute("""
+                SELECT COALESCE(SUM(usage_amount), 0) 
+                FROM usage_records 
+                WHERE tenant_id = %s 
+                AND usage_date BETWEEN date_trunc('month', CURRENT_DATE) AND CURRENT_DATE
+            """, (tenant_id,))
+            monthly_usage = cursor.fetchone()[0]
+            usage_pct = (monthly_usage / included_units * 100) if included_units > 0 else 0
+            st.markdown(f"""
+            <div class="metric-card metric-{'warning' if usage_pct > 80 else 'neutral'}">
+                <h3>Monthly Usage</h3>
+                <h2>{monthly_usage:,}/{included_units:,}</h2>
+                <div style="margin-top: 0.5rem;">
+                    <span style="color: {'#F59E0B' if usage_pct > 80 else '#3B82F6'};">{usage_pct:.1f}% of limit</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            cursor.execute("""
+                SELECT COUNT(*) FROM invoices 
+                WHERE tenant_id = %s 
+                AND due_date < CURRENT_DATE 
+                AND is_paid = FALSE
+            """, (tenant_id,))
+            overdue_invoices = cursor.fetchone()[0]
+            st.markdown(f"""
+            <div class="metric-card metric-{'danger' if overdue_invoices > 0 else 'success'}">
+                <h3>Overdue Invoices</h3>
+                <h2>{overdue_invoices}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('<div class="custom-divider"></div>', unsafe_allow_html=True)
 
         # --- Tabs Layout ---
         tab1, tab2, tab3, tab4 = st.tabs([
@@ -68,23 +245,40 @@ def admin_dashboard():
 
         with tab1:
             # Usage Analytics Tab
-            st.subheader("Usage Analytics", divider="blue")
+            st.markdown("""
+            <div class="section-header">
+                <div class="icon">📊</div>
+                <h2>Usage Analytics</h2>
+            </div>
+            """, unsafe_allow_html=True)
             
             # Filters sidebar
             with st.sidebar:
-                st.subheader("🔍 Filters")
+                st.markdown("""
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="color: #1F2937; margin-bottom: 0.5rem;">🔍 Filters</h3>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 st.session_state.filter_user = st.selectbox(
                     "Filter by User",
                     user_options,
-                    index=user_options.index(st.session_state.filter_user)
+                    index=user_options.index(st.session_state.filter_user),
+                    key="user_filter_select"
                 )
+                
                 st.session_state.filter_date_range = st.date_input(
                     "Date Range",
                     value=st.session_state.filter_date_range,
-                    max_value=datetime.now()
+                    max_value=datetime.now(),
+                    key="date_range_filter"
                 )
                 
-                metric_filter = st.text_input("Filter by Metric Name")
+                metric_filter = st.text_input(
+                    "Filter by Metric Name",
+                    placeholder="Search metrics...",
+                    key="metric_filter"
+                )
 
             # Apply filters to data
             user_filter = st.session_state.filter_user.split("(ID: ")[1][:-1] if st.session_state.filter_user != "All" else None
@@ -125,53 +319,70 @@ def admin_dashboard():
                 df["Date"] = pd.to_datetime(df["Date"])
                 df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-                # Summary Metrics
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Usage", f"{df['Quantity'].sum():,} units")
-                with col2:
-                    overage = max(0, df["Quantity"].sum() - included_units)
-                    st.metric("Estimated Overage", f"{overage:,} units", 
-                            delta_color="inverse" if overage > 0 else "normal")
-                with col3:
-                    st.metric("Unique Metrics", df["Metric"].nunique())
-
                 # Visualizations
-                st.subheader("Usage Trends", divider="gray")
+                st.markdown("""
+                <div class="section-header">
+                    <div class="icon">📈</div>
+                    <h2>Usage Trends</h2>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Time series chart
+                # Time series chart with Plotly
                 trend_data = df.groupby(["Date", "Metric"])["Quantity"].sum().reset_index()
-                trend_chart = alt.Chart(trend_data).mark_area(opacity=0.7).encode(
-                    x="Date:T",
-                    y="Quantity:Q",
-                    color="Metric:N",
-                    tooltip=["Date", "Metric", "Quantity"]
-                ).properties(height=400)
-                st.altair_chart(trend_chart, use_container_width=True)
+                fig = px.area(
+                    trend_data,
+                    x="Date",
+                    y="Quantity",
+                    color="Metric",
+                    title="Usage Over Time",
+                    template="plotly_white",
+                    line_shape="spline"
+                )
+                fig.update_layout(
+                    hovermode="x unified",
+                    xaxis_title="Date",
+                    yaxis_title="Usage Quantity",
+                    legend_title="Metric"
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
                 # Top users chart
-                st.subheader("Usage by User", divider="gray")
+                st.markdown("""
+                <div class="section-header">
+                    <div class="icon">👥</div>
+                    <h2>Usage by User</h2>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 user_data = df.groupby("User")["Quantity"].sum().reset_index().sort_values("Quantity", ascending=False)
-                user_chart = alt.Chart(user_data).mark_bar().encode(
-                    x="User:N",
-                    y="Quantity:Q",
-                    color=alt.Color("User:N", legend=None),
-                    tooltip=["User", "Quantity"]
-                ).properties(height=300)
-                st.altair_chart(user_chart, use_container_width=True)
+                fig = px.bar(
+                    user_data,
+                    x="User",
+                    y="Quantity",
+                    color="Quantity",
+                    color_continuous_scale="Viridis",
+                    title="Usage by User"
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
                 # Export options
-                with st.expander("📤 Export Data"):
+                with st.expander("📤 Export Data", expanded=False):
                     st.download_button(
                         "Download Usage Data (CSV)",
                         df.to_csv(index=False),
                         file_name=f"usage_data_{tenant_id}.csv",
-                        mime="text/csv"
+                        mime="text/csv",
+                        use_container_width=True
                     )
 
         with tab2:
             # Billing & Invoices Tab
-            st.subheader("Billing Overview", divider="blue")
+            st.markdown("""
+            <div class="section-header">
+                <div class="icon">🧾</div>
+                <h2>Billing Overview</h2>
+            </div>
+            """, unsafe_allow_html=True)
             
             # Invoice status summary
             cursor.execute("""
@@ -179,7 +390,8 @@ def admin_dashboard():
                     i.id,
                     u.username,
                     i.invoice_date,
-                    i.total_amount,
+                    i.due_date,
+                    i.total_invoiced,
                     i.is_paid,
                     COALESCE(SUM(p.amount), 0) as paid_amount
                 FROM invoices i
@@ -197,62 +409,105 @@ def admin_dashboard():
             else:
                 # Create DataFrame
                 inv_df = pd.DataFrame(invoices, columns=[
-                    "ID", "User", "Date", "Total", "Paid", "Paid Amount"
+                    "ID", "User", "Invoice Date", "Due Date", "Total", "Paid", "Paid Amount"
                 ])
-                inv_df["Date"] = pd.to_datetime(inv_df["Date"])
+                inv_df["Invoice Date"] = pd.to_datetime(inv_df["Invoice Date"])
+                inv_df["Due Date"] = pd.to_datetime(inv_df["Due Date"])
                 inv_df["Status"] = inv_df.apply(
-                    lambda x: "✅ Paid" if x["Paid"] else "⚠️ Partial" if x["Paid Amount"] > 0 else "❌ Unpaid",
+                    lambda x: "Paid" if x["Paid"] else "Partial" if x["Paid Amount"] > 0 else "Unpaid",
+                    axis=1
+                )
+                inv_df["Days Overdue"] = inv_df.apply(
+                    lambda x: (datetime.now().date() - x["Due Date"].date()).days 
+                    if not x["Paid"] and x["Due Date"].date() < datetime.now().date() else 0,
                     axis=1
                 )
 
-                # Summary metrics
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Invoices", len(inv_df))
-                with col2:
-                    paid_invoices = inv_df[inv_df["Paid"]].shape[0]
-                    st.metric("Paid Invoices", f"{paid_invoices} ({paid_invoices/len(inv_df):.0%})")
-                with col3:
-                    outstanding = inv_df[~inv_df["Paid"]]["Total"].sum()
-                    st.metric("Outstanding Amount", f"R{outstanding:,.2f}")
-
                 # Invoice table with filters
-                st.subheader("Invoice Details", divider="gray")
+                st.markdown("""
+                <div class="section-header">
+                    <div class="icon">📋</div>
+                    <h2>Invoice Details</h2>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 status_filter = st.multiselect(
                     "Filter by Status",
-                    options=["✅ Paid", "⚠️ Partial", "❌ Unpaid"],
-                    default=["✅ Paid", "⚠️ Partial", "❌ Unpaid"]
+                    options=["Paid", "Partial", "Unpaid"],
+                    default=["Paid", "Partial", "Unpaid"],
+                    key="invoice_status_filter"
                 )
                 
                 filtered_df = inv_df[inv_df["Status"].isin(status_filter)]
+                
+                # Display with AgGrid for better interactivity
                 st.dataframe(
-                    filtered_df[["ID", "User", "Date", "Total", "Paid Amount", "Status"]],
+                    filtered_df[["ID", "User", "Invoice Date", "Due Date", "Total", "Paid Amount", "Status", "Days Overdue"]],
                     use_container_width=True,
                     hide_index=True,
                     column_config={
                         "ID": "Invoice #",
-                        "Date": st.column_config.DateColumn(),
+                        "Invoice Date": st.column_config.DateColumn(),
+                        "Due Date": st.column_config.DateColumn(),
                         "Total": st.column_config.NumberColumn(format="R%.2f"),
-                        "Paid Amount": st.column_config.NumberColumn(format="R%.2f")
+                        "Paid Amount": st.column_config.NumberColumn(format="R%.2f"),
+                        "Days Overdue": st.column_config.NumberColumn(
+                            format="%d days",
+                            help="Number of days overdue (0 if paid or not due yet)"
+                        )
                     }
                 )
 
-                # Visualizations
-                st.subheader("Payment Trends", divider="gray")
+                # Payment status visualization
+                st.markdown("""
+                <div class="section-header">
+                    <div class="icon">📊</div>
+                    <h2>Payment Status</h2>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Payment status pie chart
-                status_counts = inv_df["Status"].value_counts().reset_index()
-                pie_chart = alt.Chart(status_counts).mark_arc().encode(
-                    theta="count:Q",
-                    color="Status:N",
-                    tooltip=["Status", "count"]
-                ).properties(height=300)
-                st.altair_chart(pie_chart, use_container_width=True)
+                col1, col2 = st.columns(2)
+                with col1:
+                    # Payment status pie chart
+                    status_counts = inv_df["Status"].value_counts().reset_index()
+                    fig = px.pie(
+                        status_counts,
+                        names="Status",
+                        values="count",
+                        title="Invoice Status Distribution",
+                        hole=0.4,
+                        color="Status",
+                        color_discrete_map={
+                            "Paid": "#10B981",
+                            "Partial": "#F59E0B",
+                            "Unpaid": "#EF4444"
+                        }
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Monthly revenue trend
+                    monthly_rev = inv_df.groupby(
+                        inv_df["Invoice Date"].dt.to_period("M").astype(str)
+                    )["Total"].sum().reset_index()
+                    fig = px.bar(
+                        monthly_rev,
+                        x="Invoice Date",
+                        y="Total",
+                        title="Monthly Invoice Totals",
+                        color="Total",
+                        color_continuous_scale="Viridis"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
         with tab3:
             # User Management Tab
-            st.subheader("User Management", divider="blue")
+            st.markdown("""
+            <div class="section-header">
+                <div class="icon">👥</div>
+                <h2>User Management</h2>
+            </div>
+            """, unsafe_allow_html=True)
             
             # User table
             cursor.execute("""
@@ -261,109 +516,135 @@ def admin_dashboard():
                     username,
                     email,
                     is_active,
-                    last_login
+                    last_login,
+                    registration_date AS created_at
                 FROM users
                 WHERE tenant_id = %s
                 ORDER BY username
             """, (tenant_id,))
             users = cursor.fetchall()
             
-            if not users:
+            if not users: 
                 st.info("No users found for this tenant")
             else:
                 user_df = pd.DataFrame(users, columns=[
-                    "ID", "Username", "Email", "Active", "Last Login"
+                    "ID", "Username", "Email", "Active", "Last Login", "Created At"
                 ])
                 user_df["Last Login"] = pd.to_datetime(user_df["Last Login"])
+                user_df["Created At"] = pd.to_datetime(user_df["Created At"])
+                user_df["Days Since Login"] = (datetime.now() - user_df["Last Login"]).dt.days
                 
+                # Display user table
                 st.dataframe(
-                    user_df,
+                    user_df[["Username", "Email", "Active", "Last Login", "Days Since Login"]],
                     use_container_width=True,
                     hide_index=True,
                     column_config={
-                        "ID": "User ID",
                         "Active": st.column_config.CheckboxColumn(),
-                        "Last Login": st.column_config.DatetimeColumn()
+                        "Last Login": st.column_config.DatetimeColumn(),
+                        "Days Since Login": st.column_config.NumberColumn(
+                            format="%d days",
+                            help="Days since last login"
+                        )
                     }
                 )
 
                 # User actions
-                st.subheader("User Actions", divider="gray")
+                st.markdown("""
+                <div class="section-header">
+                    <div class="icon">⚙️</div>
+                    <h2>User Actions</h2>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                with st.expander("🔄 Reset Password"):
-                    selected_user = st.selectbox(
-                        "Select User",
-                        [f"{row[1]} (ID: {row[0]})" for row in users]
-                    )
-                    user_id = selected_user.split("(ID: ")[1][:-1]
-                    
-                    new_password = st.text_input("New Password", type="password")
-                    confirm_password = st.text_input("Confirm Password", type="password")
-                    
-                    if st.button("Reset Password", type="primary"):
-                        if new_password != confirm_password:
-                            st.error("Passwords do not match")
-                        elif len(new_password) < 8:
-                            st.error("Password must be at least 8 characters")
-                        else:
-                            cursor.execute(
-                                "UPDATE users SET password = %s WHERE id = %s",
-                                (new_password, user_id)
+                col1, col2 = st.columns(2)
+                with col1:
+                    with st.expander("🔄 Reset Password", expanded=True):
+                        selected_user = st.selectbox(
+                            "Select User",
+                            [f"{row[1]} (ID: {row[0]})" for row in users],
+                            key="user_select_reset"
+                        )
+                        user_id = selected_user.split("(ID: ")[1][:-1]
+                        
+                        new_password = st.text_input("New Password", type="password", key="new_pass_input")
+                        confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass_input")
+                        
+                        if st.button("Reset Password", type="primary", key="reset_pass_btn"):
+                            if new_password != confirm_password:
+                                st.error("Passwords do not match")
+                            elif len(new_password) < 8:
+                                st.error("Password must be at least 8 characters")
+                            else:
+                                cursor.execute(
+                                    "UPDATE users SET password = %s WHERE id = %s",
+                                    (new_password, user_id)
+                                )
+                                conn.commit()
+                                show_toast("Password reset successfully", "success")
+                
+                with col2:
+                    with st.expander("📊 User Usage Report", expanded=True):
+                        selected_user = st.selectbox(
+                            "Select User for Report",
+                            [f"{row[1]} (ID: {row[0]})" for row in users],
+                            key="user_select_report"
+                        )
+                        user_id = selected_user.split("(ID: ")[1][:-1]
+                        
+                        cursor.execute("""
+                            SELECT 
+                                usage_date,
+                                metric_name,
+                                usage_amount
+                            FROM usage_records
+                            WHERE user_id = %s
+                            ORDER BY usage_date DESC
+                            LIMIT 100
+                        """, (user_id,))
+                        user_usage = cursor.fetchall()
+                        
+                        if user_usage:
+                            usage_df = pd.DataFrame(user_usage, columns=["Date", "Metric", "Quantity"])
+                            
+                            # Display metrics
+                            fig = px.bar(
+                                usage_df,
+                                x="Date",
+                                y="Quantity",
+                                color="Metric",
+                                title=f"Usage for {selected_user.split(' (ID:')[0]}"
                             )
-                            conn.commit()
-                            show_toast("Password reset successfully", "success")
-
-                with st.expander("📊 User Usage Report"):
-                    selected_user = st.selectbox(
-                        "Select User for Report",
-                        [f"{row[1]} (ID: {row[0]})" for row in users]
-                    )
-                    user_id = selected_user.split("(ID: ")[1][:-1]
-                    
-                    cursor.execute("""
-                        SELECT 
-                            usage_date,
-                            metric_name,
-                            usage_amount
-                        FROM usage_records
-                        WHERE user_id = %s
-                        ORDER BY usage_date DESC
-                        LIMIT 100
-                    """, (user_id,))
-                    user_usage = cursor.fetchall()
-                    
-                    if user_usage:
-                        usage_df = pd.DataFrame(user_usage, columns=["Date", "Metric", "Quantity"])
-                        st.dataframe(usage_df, use_container_width=True)
-                        
-                        # Usage heatmap
-                        heat_df = usage_df.copy()
-                        heat_df["Date"] = pd.to_datetime(heat_df["Date"])
-                        heat_df["Day"] = heat_df["Date"].dt.date
-                        pivot = heat_df.pivot_table(
-                            index="Day",
-                            columns="Metric",
-                            values="Quantity",
-                            aggfunc="sum"
-                        ).fillna(0)
-                        
-                        st.subheader("Daily Usage Heatmap")
-                        st.dataframe(pivot.style.background_gradient(cmap="YlOrRd"), use_container_width=True)
-                    else:
-                        st.info("No usage data found for this user")
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.info("No usage data found for this user")
 
         with tab4:
             # Alerts & Notifications Tab
-            st.subheader("Alerts Dashboard", divider="blue")
+            st.markdown("""
+            <div class="section-header">
+                <div class="icon">🚨</div>
+                <h2>Alerts Dashboard</h2>
+            </div>
+            """, unsafe_allow_html=True)
             
-            # Overdue invoices
-            with st.expander("❌ Overdue Invoices", expanded=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Overdue invoices
+                st.markdown("""
+                <div class="alert-card alert-danger">
+                    <h3>❌ Overdue Invoices</h3>
+                    <p>Immediate attention required for unpaid invoices.</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 cursor.execute("""
                     SELECT 
                         i.id,
                         u.username,
                         i.due_date,
-                        i.total_amount,
+                        i.total_invoiced,
                         i.invoice_date
                     FROM invoices i
                     JOIN users u ON i.user_id = u.id
@@ -371,6 +652,7 @@ def admin_dashboard():
                     AND i.due_date < CURRENT_DATE
                     AND u.tenant_id = %s
                     ORDER BY i.due_date ASC
+                    LIMIT 5
                 """, (tenant_id,))
                 overdue = cursor.fetchall()
                 
@@ -381,15 +663,23 @@ def admin_dashboard():
                             st.markdown(f"""
                                 **Invoice #{inv_id}**  
                                 **Client:** {username}  
-                                **Amount Due:** R{amount:,.2f}  
+                                **Amount Due:** {format_currency(amount)}  
                                 **Due Date:** {due_date} ({days_overdue} days overdue)  
                                 **Issued:** {inv_date}
                             """)
+                    st.button("View All Overdue Invoices", key="view_all_overdue")
                 else:
                     st.success("✅ No overdue invoices")
-
-            # High usage alerts
-            with st.expander("🚨 High Usage Clients (>90%)", expanded=True):
+            
+            with col2:
+                # High usage alerts
+                st.markdown("""
+                <div class="alert-card alert-warning">
+                    <h3>⚠️ High Usage Clients (>90%)</h3>
+                    <p>Users approaching or exceeding plan limits.</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
                 cursor.execute("""
                     SELECT 
                         u.username,
@@ -403,6 +693,7 @@ def admin_dashboard():
                     WHERE u.tenant_id = %s
                     GROUP BY u.username, p.included_units
                     HAVING SUM(ur.usage_amount) >= 0.9 * p.included_units
+                    LIMIT 5
                 """, (tenant_id,))
                 high_usage = cursor.fetchall()
                 
@@ -415,39 +706,48 @@ def admin_dashboard():
                                 **Usage:** {usage:,.0f} of {limit:,.0f} units ({pct:.0f}%)  
                                 **Overage:** {max(0, usage - limit):,.0f} units
                             """)
+                    st.button("View All High Usage Clients", key="view_all_high_usage")
                 else:
                     st.success("✅ No high usage clients")
-
-            # Inactive users
-            with st.expander("💤 Inactive Users (No Recent Usage)", expanded=True):
-                cursor.execute("""
-                    SELECT u.username, MAX(ur.usage_date) as last_usage
-                    FROM users u
-                    LEFT JOIN usage_records ur ON u.id = ur.user_id
-                    WHERE u.tenant_id = %s
-                    GROUP BY u.username
-                    HAVING MAX(ur.usage_date) IS NULL OR MAX(ur.usage_date) < CURRENT_DATE - INTERVAL '30 days'
-                """, (tenant_id,))
-                inactive = cursor.fetchall()
-                
-                if inactive:
-                    for username, last_usage in inactive:
-                        with st.container(border=True):
-                            if last_usage:
-                                days_inactive = (datetime.now().date() - last_usage).days
-                                st.markdown(f"""
-                                    **Client:** {username}  
-                                    **Last Activity:** {last_usage} ({days_inactive} days ago)
-                                """)
-                            else:
-                                st.markdown(f"""
-                                    **Client:** {username}  
-                                    **Last Activity:** Never
-                                """)
-                else:
-                    st.success("✅ All users have recent activity")
+            
+            # Inactive users section
+            st.markdown("""
+            <div class="alert-card alert-info">
+                <h3>💤 Inactive Users</h3>
+                <p>Users with no recent activity (30+ days).</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            cursor.execute("""
+                SELECT u.username, MAX(ur.usage_date) as last_usage
+                FROM users u
+                LEFT JOIN usage_records ur ON u.id = ur.user_id
+                WHERE u.tenant_id = %s
+                GROUP BY u.username
+                HAVING MAX(ur.usage_date) IS NULL OR MAX(ur.usage_date) < CURRENT_DATE - INTERVAL '30 days'
+                LIMIT 10
+            """, (tenant_id,))
+            inactive = cursor.fetchall()
+            
+            if inactive:
+                for username, last_usage in inactive:
+                    with st.container(border=True):
+                        if last_usage:
+                            days_inactive = (datetime.now().date() - last_usage).days
+                            st.markdown(f"""
+                                **Client:** {username}  
+                                **Last Activity:** {last_usage} ({days_inactive} days ago)
+                            """)
+                        else:
+                            st.markdown(f"""
+                                **Client:** {username}  
+                                **Last Activity:** Never
+                            """)
+                st.button("View All Inactive Users", key="view_all_inactive")
+            else:
+                st.success("✅ All users have recent activity")
 
         conn.close()
 
-# if __name__ == "__main__":
-#     admin_dashboard()
+if __name__ == "__main__":
+    admin_dashboard()

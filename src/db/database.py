@@ -7,10 +7,10 @@ from config import settings
 
 def get_db_connection():
     return psycopg2.connect(
-        dbname="billing_db",
-        user="postgres",
-        password="admin",
-        host="localhost",
+        dbname=settings.DB_NAME,
+        user=settings.DB_USER,
+        password=settings.DB_PASSWORD,
+        host=settings.DB_HOST,
         options="-c client_encoding=utf8 -c bytea_output=escape",
         cursor_factory=psycopg2.extras.DictCursor
     )

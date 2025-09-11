@@ -32,7 +32,7 @@ def send_verification_email(to_email, username, token):
 
     send_email(to_email, "Verify Your Account", text_content, html_content)
     
-def send_invoce_email(to_email, subject, client_name, invoice_id, invoice_date, invoice_amount, pdf_bytes, is_paid, tenant_name):
+def send_invoice_email(to_email, subject, client_name, invoice_id, invoice_date, invoice_amount, pdf_bytes, is_paid, tenant_name):
     template = templates_env.get_template("email_invoice.html")
     html_content = template.render(client_name=client_name, invoice_id=invoice_id,
                                    invoice_date=invoice_date, invoice_amount=invoice_amount,

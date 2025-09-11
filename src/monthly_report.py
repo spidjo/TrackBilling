@@ -7,6 +7,8 @@ from contextlib import closing
 
 from db.database import get_db_connection
 from utils.email_utils import email_billing_report_to_admin
+import sys, os
+sys.path.append(os.path.dirname(__file__))
 
 # --- Setup Logging ---
 logging.basicConfig(
@@ -18,6 +20,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
 
 def is_first_of_month() -> bool:
     """Check if today is the first day of the month."""
@@ -116,11 +119,6 @@ def main():
     
     logger.info("==== Monthly Billing Scheduler Completed ====")
 
+
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        logger.info("Process interrupted by user")
-    except Exception as e:
-        logger.critical(f"Unexpected error: {str(e)}")
-        logger.debug(traceback.format_exc())
+    main()

@@ -2,21 +2,35 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Your Billing Report</title>
+    <title>Your Monthly Billing Statement | {{ app_name }}</title>
 </head>
-<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-    <div style="max-width: 600px; margin: auto; background-color: white; padding: 20px; border-radius: 8px;">
-        <h2>Monthly Billing Report</h2>
-        <p>Hi {{ username }},</p>
-        <p>Your billing report for the period <strong>{{ start_date }}</strong> to <strong>{{ end_date }}</strong> is now ready.</p>
-        <p>The report is attached to this email.</p>
-        <p>Summary:</p>
-        <ul>
-            <li>Total Usage: {{ total_usage }}</li>
-            <li>Total Cost: {{ total_cost }}</li>
-        </ul>
-        <p>If you have any questions, please contact us.</p>
-        <p>Thanks,<br>The {{ app_name }} Billing Team</p>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; margin: 0; padding: 20px;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 25px;">
+            <h1 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 22px;">Monthly Billing Statement</h1>
+            <p style="color: #7f8c8d; margin: 0; font-size: 14px;">{{ start_date }} to {{ end_date }}</p>
+        </div>
+        
+        <p style="margin-bottom: 20px;">Dear {{ username }},</p>
+        
+        <p style="margin-bottom: 20px;">Your monthly billing statement for the period <strong>{{ start_date }}</strong> to <strong>{{ end_date }}</strong> is now available. Please find the detailed report attached to this email for your records.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 25px;">
+            <h3 style="margin-top: 0; color: #2c3e50; font-size: 16px;">Summary Overview</h3>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                <li style="margin-bottom: 8px;"><strong>Total Usage:</strong> {{ total_usage }}</li>
+                <li style="margin-bottom: 0;"><strong>Total Cost:</strong> {{ total_cost }}</li>
+            </ul>
+        </div>
+        
+        <p style="margin-bottom: 20px;">Should you have any questions about your statement or need further clarification regarding your usage, please don't hesitate to contact our billing support team.</p>
+        
+        <p style="margin-bottom: 5px;">Thank you for your continued business.</p>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eeeeee;">
+            <p style="margin: 0; font-size: 14px; color: #7f8c8d;">Best regards,</p>
+            <p style="margin: 5px 0 0 0; font-weight: bold; color: #2c3e50;">The {{ app_name }} Billing Team</p>
+        </div>
     </div>
 </body>
 </html>

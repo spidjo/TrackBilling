@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ subject }}</title>
+    <title>Payment Confirmation #{{ invoice_id }} | {{ tenant_name }}</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -16,79 +16,122 @@
         .container {
             max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 0;
             background-color: #ffffff;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
         }
         .header {
             text-align: center;
-            padding: 20px 0;
+            padding: 30px 20px;
             border-bottom: 1px solid #eeeeee;
+            background-color: #ffffff;
         }
         .logo {
             max-height: 50px;
         }
         .content {
-            padding: 30px 20px;
+            padding: 30px;
         }
-        .success-icon {
+        .confirmation-icon {
             color: #4CAF50;
-            font-size: 48px;
+            font-size: 60px;
             text-align: center;
-            margin-bottom: 20px;
+            margin: 0 auto 20px;
+            width: 80px;
+            height: 80px;
+            border: 2px solid #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         h1 {
             color: #2c3e50;
             font-size: 24px;
-            margin-top: 0;
+            margin: 0 0 20px 0;
             text-align: center;
+            font-weight: 600;
         }
-        .invoice-details {
+        .receipt-card {
             background-color: #f9f9f9;
             border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
+            padding: 25px;
+            margin: 30px 0;
+            border: 1px solid #eeeeee;
         }
         .detail-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eeeeee;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
         }
         .detail-label {
-            font-weight: bold;
+            font-weight: 600;
             color: #555555;
+            font-size: 15px;
         }
         .detail-value {
             color: #2c3e50;
+            font-weight: 500;
         }
         .amount {
-            font-size: 28px;
-            font-weight: bold;
+            font-size: 32px;
+            font-weight: 700;
             color: #2c3e50;
             text-align: center;
-            margin: 20px 0;
+            margin: 25px 0;
+            letter-spacing: -0.5px;
         }
         .footer {
             text-align: center;
-            padding: 20px;
+            padding: 25px;
             font-size: 12px;
             color: #999999;
             border-top: 1px solid #eeeeee;
+            background-color: #fafafa;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
         }
         .button {
             display: inline-block;
             background-color: #4CAF50;
             color: white !important;
             text-decoration: none;
-            padding: 12px 25px;
+            padding: 14px 30px;
             border-radius: 4px;
-            font-weight: bold;
-            margin: 20px auto;
+            font-weight: 600;
+            font-size: 15px;
             text-align: center;
+            transition: background-color 0.3s ease;
+        }
+        .button:hover {
+            background-color: #3e8e41;
         }
         .support {
-            margin-top: 30px;
+            margin-top: 35px;
             font-size: 14px;
             color: #666666;
+            text-align: center;
+        }
+        .greeting {
+            margin-bottom: 25px;
+            font-size: 16px;
+        }
+        .transaction-reference {
+            background-color: #f0f0f0;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            display: inline-block;
         }
     </style>
 </head>
@@ -99,37 +142,44 @@
         </div>
         
         <div class="content">
-            <div class="success-icon">✓</div>
-            <h1>Payment Verified</h1>
+            <div class="confirmation-icon">✓</div>
+            <h1>Payment Confirmation</h1>
             
-            <p>Hello {{ username }},</p>
-            <p>Your payment has been successfully processed and verified by our team. Below are the details of your transaction:</p>
+            <div class="greeting">
+                <p>Dear {{ username }},</p>
+                <p>We're pleased to confirm that we've successfully processed your payment. Below you'll find the details of your transaction for your records.</p>
+            </div>
             
-            <div class="invoice-details">
-                <div class="amount">R{{ "%.2f"|format(amount) }}</div>
+            <div class="receipt-card">
+                <div class="amount">R{{ "%0.2f"|format(amount) }}</div>
                 
                 <div class="detail-row">
                     <span class="detail-label">Invoice Number:</span>
-                    <span class="detail-value">#{{ invoice_id }}</span>
+                    <span class="detail-value transaction-reference">#{{ invoice_id }}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Payment Date:</span>
                     <span class="detail-value">{{ invoice_date }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Payment Status:</span>
-                    <span class="detail-value" style="color: #4CAF50; font-weight: bold;">Verified</span>
+                    <span class="detail-label">Payment Method:</span>
+                    <span class="detail-value">{{ payment_method or "Credit Card" }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Confirmation Status:</span>
+                    <span class="detail-value" style="color: #4CAF50; font-weight: 600;">Verified and Completed</span>
                 </div>
             </div>
             
-            <p style="text-align: center;">
-                <a href="{{ app_url }}/invoices/{{ invoice_id }}" class="button">View Invoice</a>
-            </p>
+            <div class="button-container">
+                <a href="{{ app_url }}/invoices/{{ invoice_id }}" class="button">View Full Invoice Details</a>
+            </div>
             
-            <p>Thank you for your payment. This transaction will appear on your billing statement as <strong>{{ tenant_name }}</strong>.</p>
+            <p>This transaction will appear on your statement as <strong>{{ tenant_name }}</strong>. A receipt has been automatically generated and is available in your account.</p>
             
             <div class="support">
-                <p>Need help or have questions? Contact our support team at <a href="mailto:support@example.com">support@example.com</a></p>
+                <p>If you have any questions about this payment or need further assistance, our support team is here to help.</p>
+                <p>Email: <a href="mailto:support@{{ tenant_name|lower }}.com">support@{{ tenant_name|lower }}.com</a> | Phone: +27 XX XXX XXXX</p>
             </div>
         </div>
         
@@ -137,7 +187,11 @@
             <p>&copy; {{ year }} {{ tenant_name }}. All rights reserved.</p>
             <p>
                 <a href="{{ app_url }}/privacy">Privacy Policy</a> | 
-                <a href="{{ app_url }}/terms">Terms of Service</a>
+                <a href="{{ app_url }}/terms">Terms of Service</a> |
+                <a href="{{ app_url }}/contact">Contact Us</a>
+            </p>
+            <p style="margin-top: 10px; font-size: 11px; color: #bbbbbb;">
+                This is an automated message. Please do not reply directly to this email.
             </p>
         </div>
     </div>

@@ -23,6 +23,7 @@ cursor.execute("""
             email TEXT,
             region TEXT,
             phone TEXT,
+            vat_number TEXT,
             industry TEXT,
             logo_url TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

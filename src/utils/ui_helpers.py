@@ -1,11 +1,161 @@
+# src/utils/ui_helpers.py
 import streamlit as st
-from datetime import datetime, timedelta
-from typing import Dict, Optional, Callable, Any
+from datetime import date, datetime, timedelta
+from typing import Dict, Optional, Callable, Any, Union, Tuple
 import time
 import random
 from functools import wraps
+import traceback
 
-# Loading Animations
+# ======================
+# EMPTY STATE DISPLAY
+# ======================
+
+def display_empty_state(
+    title: str,
+    description: Optional[str] = None,
+    icon: str = "ℹ️",
+    width: Optional[int] = None,
+    action: Optional[Tuple[str, Callable]] = None
+) -> None:
+    """
+    Display a styled empty state message with optional action button.
+    
+    Args:
+        title: Main title/message to display
+        description: Additional descriptive text
+        icon: Icon to display (emoji or icon name)
+        width: Custom width for the container
+        action: Tuple of (button_text, callback) for primary action
+    """
+    container = st.container(border=True)
+    
+    if width:
+        container.markdown(
+            f"<style>.st-emotion-cache-1h9usn1 {{width: {width}px !important;}}</style>",
+            unsafe_allow_html=True
+        )
+    
+    with container:
+        # Center content
+        st.markdown(
+            """
+            <style>
+                .empty-state {
+                    text-align: center;
+                    padding: 2rem 1rem;
+                }
+                .empty-state-icon {
+                    font-size: 3rem;
+                    margin-bottom: 1rem;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+        
+        st.markdown(
+            f"""
+            <div class="empty-state">
+                <div class="empty-state-icon">{icon}</div>
+                <h3>{title}</h3>
+                {f'<p>{description}</p>' if description else ''}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        
+        if action:
+            st.button(
+                action[0],
+                on_click=action[1],
+                use_container_width=True,
+                type="primary"
+            )
+
+# ======================
+# ERROR HANDLING & DISPLAY
+# ======================
+
+def display_error(
+    message: Union[str, Exception],
+    details: Optional[str] = None,
+    width: Optional[int] = None,
+    dismissible: bool = True
+) -> None:
+    """
+    Display a styled error message with optional details.
+    
+    Args:
+        message: Main error message or Exception object
+        details: Additional technical details to show
+        width: Custom width for the error container
+        dismissible: Whether to show a dismiss button
+    """
+    if isinstance(message, Exception):
+        details = details or str(message)
+        message = "An unexpected error occurred"
+    
+    container = st.container(border=True)
+    
+    if width:
+        container.markdown(
+            f"<style>.st-emotion-cache-1h9usn1 {{width: {width}px !important;}}</style>",
+            unsafe_allow_html=True
+        )
+    
+    with container:
+        cols = st.columns([1, 20])  # For icon alignment
+        with cols[0]:
+            st.error("")  # Just for the icon
+        with cols[1]:
+            st.markdown(f"**{message}**")
+        
+        if details:
+            with st.expander("Technical Details", expanded=False):
+                st.code(details, language="text")
+        
+        if dismissible:
+            st.button("Dismiss", key=f"dismiss_{random.randint(0, 1000)}")
+
+def display_warning(message: str, details: Optional[str] = None) -> None:
+    """Display a styled warning message"""
+    container = st.container(border=True)
+    with container:
+        cols = st.columns([1, 20])
+        with cols[0]:
+            st.warning("")  # Just for the icon
+        with cols[1]:
+            st.markdown(f"**{message}**")
+        
+        if details:
+            with st.expander("Details", expanded=False):
+                st.text(details)
+
+def handle_errors(func: Optional[Callable] = None, *, show_traceback: bool = False):
+    """
+    Decorator to handle and display errors gracefully.
+    
+    Args:
+        show_traceback: Whether to display full traceback in error details
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                details = traceback.format_exc() if show_traceback else str(e)
+                display_error(e, details=details)
+                return None
+        return wrapper
+    
+    return decorator(func) if func else decorator
+
+# ======================
+# LOADING ANIMATIONS
+# ======================
+
 def display_loading_animation(text: str = "Processing...", animation_type: str = "dots"):
     """Display animated loading indicator that properly stops when context exits"""
     import threading
@@ -28,7 +178,8 @@ def display_loading_animation(text: str = "Processing...", animation_type: str =
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             self.stop_event.set()
-            self.animation_thread.join()  # Wait for animation to stop
+            if self.animation_thread:
+                self.animation_thread.join()
             self.placeholder.empty()
 
         def _run_animation(self):
@@ -59,7 +210,10 @@ def loading_spinner(text: str = "Processing..."):
     """Simpler loading spinner"""
     return st.spinner(text)
 
-# Form Helpers
+# ======================
+# FORM HELPERS
+# ======================
+
 def center_form(width: int = 500):
     """Center a form on the page with custom width"""
     st.markdown(
@@ -78,13 +232,16 @@ def center_form(width: int = 500):
 def show_form_errors(errors: Dict[str, str], title: str = "Please fix the following errors:"):
     """Display form validation errors"""
     if errors:
-        with st.container():
+        with st.container(border=True):
             st.error(title)
             for field, message in errors.items():
                 st.markdown(f"• **{field.capitalize()}**: {message}")
             st.write("")  # Add spacing
 
-# Notifications
+# ======================
+# NOTIFICATIONS
+# ======================
+
 def show_toast(message: str, type: str = "success", duration: int = 3):
     """Show temporary toast notification"""
     icons = {
@@ -93,11 +250,22 @@ def show_toast(message: str, type: str = "success", duration: int = 3):
         "warning": "⚠️",
         "info": "ℹ️"
     }
-    st.toast(message, icon=icons.get(type, "ℹ️"))
+    st.toast(f"{icons.get(type, 'ℹ️')} {message}")
     if duration > 0:
         st.session_state['_toast_timeout'] = datetime.now() + timedelta(seconds=duration)
 
-# Password Helpers
+def show_success(message: str, duration: int = 3) -> None:
+    """Display success message with auto-dismiss"""
+    show_toast(message, "success", duration)
+
+def show_failure(message: str, duration: int = 5) -> None:
+    """Display error message with longer auto-dismiss"""
+    show_toast(message, "error", duration)
+
+# ======================
+# PASSWORD HELPERS
+# ======================
+
 def validate_password(password: str) -> bool:
     """Check password meets complexity requirements"""
     return (
@@ -137,7 +305,10 @@ def password_strength_meter(password: str) -> None:
             unsafe_allow_html=True
         )
 
-# Decorators
+# ======================
+# DECORATORS
+# ======================
+
 def with_loading_animation(func: Callable = None, *, text: str = "Processing..."):
     """Decorator to add loading animation to functions"""
     def decorator(f):
@@ -148,3 +319,53 @@ def with_loading_animation(func: Callable = None, *, text: str = "Processing..."
         return wrapper
     
     return decorator(func) if func else decorator
+
+def with_error_handling(func: Optional[Callable] = None, *, show_traceback: bool = False):
+    """
+    Decorator to handle and display errors gracefully.
+    
+    Args:
+        show_traceback: Whether to display full traceback in error details
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                details = traceback.format_exc() if show_traceback else str(e)
+                display_error(e, details=details)
+                return None
+        return wrapper
+    
+    return decorator(func) if func else decorator
+
+# Add this to src/utils/ui_helpers.py (anywhere in the file)
+
+def format_date(date_obj: Union[datetime, date, str, None], format: str = "%d %b %Y") -> str:
+    """
+    Format a date object or ISO date string into a human-readable format.
+    
+    Args:
+        date_obj: Date to format (datetime, date, or ISO string)
+        format: Format string (default: "dd Mon YYYY")
+    
+    Returns:
+        Formatted date string or "N/A" if invalid/None
+    """
+    if date_obj is None:
+        return "N/A"
+    
+    if isinstance(date_obj, str):
+        try:
+            if "T" in date_obj:  # ISO format with time
+                date_obj = datetime.fromisoformat(date_obj)
+            else:  # Just date
+                date_obj = datetime.strptime(date_obj, "%Y-%m-%d")
+        except ValueError:
+            return "N/A"
+    
+    if isinstance(date_obj, (datetime, date)):
+        return date_obj.strftime(format)
+    
+    return "N/A"

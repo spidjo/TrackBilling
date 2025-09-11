@@ -2,18 +2,115 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Verify Your Email</title>
+    <title>Verify Your Email Address | {{ app_name }}</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        .content {
+            padding: 30px;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .verify-button {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white !important;
+            text-decoration: none;
+            padding: 14px 28px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .verify-button:hover {
+            background-color: #3e8e41;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #777777;
+            font-size: 14px;
+            border-top: 1px solid #eeeeee;
+        }
+        .verification-code {
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .expiry-notice {
+            color: #777777;
+            font-size: 14px;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
 </head>
-<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-    <div style="max-width: 600px; margin: auto; background-color: white; padding: 20px; border-radius: 8px;">
-        <h2>Welcome to {{ app_name }}!</h2>
-        <p>Hi {{ username }},</p>
-        <p>Thank you for registering. Please verify your email address by clicking the button below:</p>
-        <p style="text-align: center;">
-            <a href="{{ verify_url }}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-        </p>
-        <p>If you didn’t request this, you can ignore this email.</p>
-        <p>Thanks,<br>The {{ app_name }} Team</p>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 22px;">Welcome to {{ app_name }}</h1>
+        </div>
+        
+        <div class="content">
+            <p>Dear {{ username }},</p>
+            
+            <p>Thank you for creating an account with {{ app_name }}. To complete your registration and ensure the security of your account, please verify your email address by clicking the button below:</p>
+            
+            <div class="button-container">
+                <a href="{{ verify_url }}" class="verify-button">Verify Email Address</a>
+            </div>
+            
+            <p style="text-align: center;">Or copy and paste this link into your browser:<br>
+            <span style="word-break: break-all; font-size: 13px; color: #3498db;">{{ verify_url }}</span></p>
+            
+            <div class="expiry-notice">
+                This verification link will expire in 24 hours.
+            </div>
+            
+            <p>If you didn't create an account with {{ app_name }}, please ignore this email or contact our support team immediately at <a href="mailto:support@{{ app_name|lower }}.com">support@{{ app_name|lower }}.com</a>.</p>
+            
+            <p>For security reasons, we recommend you verify your email address as soon as possible to ensure uninterrupted access to your account.</p>
+        </div>
+        
+        <div class="footer">
+            <p style="margin: 0;">Best regards,<br>The {{ app_name }} Security Team</p>
+            <p style="margin: 15px 0 0 0; font-size: 13px;">
+                <a href="{{ app_url }}" style="color: #3498db; text-decoration: none;">Visit our website</a> | 
+                <a href="{{ app_url }}/support" style="color: #3498db; text-decoration: none;">Contact support</a> | 
+                <a href="{{ app_url }}/security" style="color: #3498db; text-decoration: none;">Security tips</a>
+            </p>
+            <p style="margin-top: 10px; font-size: 11px; color: #bbbbbb;">
+                This is an automated security message. Please do not reply directly to this email.
+            </p>
+        </div>
     </div>
 </body>
 </html>

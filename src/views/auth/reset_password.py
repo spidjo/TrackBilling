@@ -1,12 +1,15 @@
 import streamlit as st
 import bcrypt
+from datetime import datetime, timezone
 from db.database import get_db_connection
 from utils.ui_helpers import show_toast, validate_password
 
 def reset_password():
     st.title("🔐 Set New Password")
     
-    token = st.query_params.get("token")
+    params = st.query_params
+    token = params.get("token")
+    
     if not token:
         st.error("Invalid or missing token")
         return
@@ -15,14 +18,14 @@ def reset_password():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
         # Validate token
         cursor.execute("""
             SELECT user_id FROM password_resets
             WHERE token = %s 
-            AND is_used = False
-            AND created_at >= NOW() - INTERVAL '1 hour'
+            AND is_used = false
+            AND expires_at >= current_timestamp
         """, (token,))
+        
         
         result = cursor.fetchone()
         if not result:
@@ -41,7 +44,6 @@ def reset_password():
                 elif not validate_password(new_password):
                     show_toast("Password doesn't meet requirements", "error")
                 else:
-                    # Update password
                     hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
                     cursor.execute("""
                         UPDATE users 
@@ -49,7 +51,6 @@ def reset_password():
                         WHERE id = %s
                     """, (hashed.decode('utf-8'), user_id))
                     
-                    # Mark token as used
                     cursor.execute("""
                         UPDATE password_resets
                         SET is_used = True
@@ -59,7 +60,9 @@ def reset_password():
                     conn.commit()
                     show_toast("Password updated successfully!", "success")
                     st.balloons()
-                    st.experimental_rerun()
+                    # Redirect to login page after reset
+                    st.query_params.clear()  # clear token param
+                    st.rerun()
                     
     except Exception as e:
         if conn: conn.rollback()

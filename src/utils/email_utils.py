@@ -1,9 +1,11 @@
 # utils/email_utils.py
 
 import smtplib
+from datetime import datetime    
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+from venv import logger
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from datetime import datetime
 from pathlib import Path
@@ -93,17 +95,20 @@ def send_email_with_attachment(to_email, subject, body_text, filename, file_byte
         return False
 
 def email_billing_report_to_admin(tenant_id, start_date, end_date):
-    """
-    Generate and email a billing report PDF to the tenant admin
-    
-    Args:
-        tenant_id: ID of the tenant to generate report for
-        start_date: Start date of report period (YYYY-MM-DD)
-        end_date: End date of report period (YYYY-MM-DD)
-    """
-    print(f"Generating billing report for tenant {tenant_id} ({start_date} to {end_date})")
+    """Generate and email a billing report PDF to the tenant admin"""
+    logger.info(f"Generating billing report for tenant {tenant_id} ({start_date} to {end_date})")
     
     try:
+        # Generate PDF report first
+        # Convert date objects to datetime objects
+        report_start_dt = datetime.combine(start_date, datetime.min.time())
+        report_end_dt = datetime.combine(end_date, datetime.max.time())
+
+        pdf_bytes = generate_tenant_billing_report_pdf(tenant_id, report_start_dt, report_end_dt)
+        if not pdf_bytes:
+            logger.error(f"Failed to generate PDF for tenant {tenant_id}")
+            return False
+
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -116,13 +121,11 @@ def email_billing_report_to_admin(tenant_id, start_date, end_date):
         result = cursor.fetchone()
         
         if not result:
-            print(f"No admin found for tenant {tenant_id}")
+            logger.error(f"No admin found for tenant {tenant_id}")
             return False
 
         admin_email, company_name = result
         
-        # Generate PDF report
-        pdf_bytes = generate_tenant_billing_report_pdf(tenant_id, start_date, end_date)
         filename = f"{company_name}_Billing_Report_{start_date}_to_{end_date}.pdf"
         
         # Prepare email content
@@ -156,21 +159,22 @@ def email_billing_report_to_admin(tenant_id, start_date, end_date):
         )
         
         if success:
-            print(f"✅ Billing report sent to {admin_email}")
+            logger.info(f"✅ Billing report sent to {admin_email}")
         else:
-            print(f"❌ Failed to send billing report to {admin_email}")
+            logger.error(f"❌ Failed to send billing report to {admin_email}")
             
         return success
         
     except Exception as e:
-        print(f"❌ Error generating/sending billing report: {e}")
+        logger.error(f"❌ Error in billing report process for tenant {tenant_id}: {str(e)}")
         return False
     finally:
-        if conn:
+        if 'conn' in locals() and conn:
             conn.close()
 
 def send_payment_verified_email(to_email, username, amount, invoice_id, invoice_date, tenant_name):
     """Send payment verification confirmation email"""
+    print(f"Sending payment verification email to {to_email} for invoice {invoice_id}")
     subject = f"💰 Payment Verified for Invoice #{invoice_id}"
     
     html_body = render_email_template(
@@ -215,12 +219,20 @@ def send_usage_alert_email(to_email, username, metric_name, usage, limit):
     """Send usage alert email"""
     subject = f"⚠️ Usage Alert: {metric_name}"
     
+    # Calculate the percentage used
+    percent_used = min(100, (usage / limit) * 100) if limit else 0
+    
+    print(f"Sending usage alert email to {to_email} for {metric_name} usage")
     html_body = render_email_template(
         "usage_alert.html",
         username=username,
         metric_name=metric_name,
         usage=usage,
-        limit=limit
+        limit=limit,
+        percent_used=percent_used,  # Add this
+        plan_limit=limit,           # Add this if needed
+        current_usage=usage,       # Add this if needed
+        app_name="Your App Name"   # Add your app name here
     )
     
     text_body = (
@@ -229,5 +241,10 @@ def send_usage_alert_email(to_email, username, metric_name, usage, limit):
         f"which exceeds your limit of {limit}.\n\n"
         "Please consider upgrading your plan."
     )
-    
-    return send_email(to_email, subject, text_body, html_body)
+
+    print(f'about to send email to {to_email} for {metric_name} usage')
+    result = send_email(to_email, subject, text_body, html_body)
+    if result:
+        print(f"✅ Usage alert email sent to {to_email} for {metric_name} usage")
+    else:
+        print(f"❌ Failed to send usage alert email to {to_email} for {metric_name} usage")

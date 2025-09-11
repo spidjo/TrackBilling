@@ -22,7 +22,7 @@ registration_date = datetime.date.today().isoformat()
 # Insert an admin superadmin (example)
 cursor.execute("""INSERT INTO users (username, password, first_name, last_name, company_name, email, registration_date, is_verified, verification_token, role)
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-""", ("admin_mzansi", hashed_pw, "Alice", "Alpha", "MzanziTel", "admin@alpha.com", registration_date, 1, None, "admin"))
+""", ("superadmin", hashed_pw, "Alice", "Alpha", "Billing Co.", "superadmin@billingco.com", registration_date, 1, None, "superadmin"))
 
 # # Insert a sample user (example)
 # cursor.execute("""INSERT INTO users (username, password, first_name, last_name, company_name, email, registration_date, is_verified, verification_token, role, tenant_id)

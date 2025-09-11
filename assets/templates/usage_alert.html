@@ -2,20 +2,153 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Usage Alert</title>
+    <title>Usage Notification: {{ metric_name }} Approaching Limit | {{ app_name }}</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 30px;
+        }
+        .alert-banner {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 0 4px 4px 0;
+        }
+        .usage-details {
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eeeeee;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #555555;
+        }
+        .detail-value {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        .progress-container {
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: {% if percent_used >= 90 %}#e74c3c{% elif percent_used >= 75 %}#f39c12{% else %}#3498db{% endif %};
+            width: {{ percent_used }}%;
+            border-radius: 4px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #777777;
+            font-size: 14px;
+            border-top: 1px solid #eeeeee;
+        }
+        .button {
+            display: inline-block;
+            background-color: #3498db;
+            color: white !important;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+    </style>
 </head>
-<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-    <div style="max-width: 600px; margin: auto; background-color: white; padding: 20px; border-radius: 8px;">
-        <h2>Usage Alert</h2>
-        <p>Hi {{ username }},</p>
-        <p>You have used <strong>{{ percent_used }}%</strong> of your quota for <strong>{{ metric_name }}</strong>.</p>
-        <p>Details:</p>
-        <ul>
-            <li>Plan Limit: {{ plan_limit }}</li>
-            <li>Current Usage: {{ current_usage }}</li>
-        </ul>
-        <p>Consider upgrading your plan or monitoring usage more closely.</p>
-        <p>Thanks,<br>The {{ app_name }} Team</p>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 20px;">Usage Notification</h1>
+        </div>
+        
+        <div class="content">
+            <div class="alert-banner">
+                <p style="margin: 0; font-weight: 600; color: #2c3e50;">
+                    You've used <span style="color: {% if percent_used >= 90 %}#e74c3c{% elif percent_used >= 75 %}#f39c12{% else %}#3498db{% endif %};">{{ percent_used }}%</span>
+                    of your {{ metric_name }} quota
+                </p>
+            </div>
+            
+            <p>Dear {{ username }},</p>
+            
+            <p>We're notifying you that your account has reached <strong>{{ percent_used }}%</strong> of the allocated quota for <strong>{{ metric_name }}</strong>. Below are the details of your current usage:</p>
+            
+            <div class="usage-details">
+                <div class="progress-container">
+                    <div class="progress-bar"></div>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Plan Limit:</span>
+                    <span class="detail-value">{{ plan_limit }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Current Usage:</span>
+                    <span class="detail-value">{{ current_usage }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Remaining Available:</span>
+                    <span class="detail-value">{{ plan_limit - current_usage }}</span>
+                </div>
+            </div>
+            
+            <p>To avoid any service interruptions, we recommend:</p>
+            <ul style="padding-left: 20px;">
+                <li>Reviewing your usage patterns</li>
+                <li>Optimizing your current consumption</li>
+                <li>Considering an upgrade to a higher plan if needed</li>
+            </ul>
+            
+            <div style="text-align: center; margin: 25px 0;">
+                <a href="{{ app_url }}/billing/upgrade" class="button">View Upgrade Options</a>
+            </div>
+            
+            <p>If you have any questions about your usage or need assistance, please don't hesitate to contact our support team.</p>
+        </div>
+        
+        <div class="footer">
+            <p style="margin: 0;">Best regards,<br>The {{ app_name }} Team</p>
+            <p style="margin: 15px 0 0 0; font-size: 13px;">
+                <a href="{{ app_url }}/support" style="color: #3498db; text-decoration: none;">Contact Support</a> | 
+                <a href="{{ app_url }}/billing" style="color: #3498db; text-decoration: none;">Billing Center</a>
+            </p>
+        </div>
     </div>
 </body>
 </html>
