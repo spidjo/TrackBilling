@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS plans
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION
-)
+);
 
 -- Subscriptions
 CREATE TABLE IF NOT EXISTS subscriptions
@@ -513,4 +513,19 @@ CREATE TABLE IF NOT EXISTS platform_fees
     amount_cents integer NOT NULL,
     processed_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT platform_fees_pkey PRIMARY KEY (transaction_id)
+);
+
+CREATE TABLE IF NOT EXISTS verification_resend_log
+(
+    id SERIAL PRIMARY KEY,
+    user_id integer,
+    "timestamp" timestamp without time zone,
+    ip_address text COLLATE pg_catalog."default",
+    status text COLLATE pg_catalog."default",
+    reason text COLLATE pg_catalog."default",
+    attempt_count numeric,
+    CONSTRAINT verification_resend_log_user_id_fkey FOREIGN KEY (user_id)
+        REFERENCES users (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE NO ACTION
 );
