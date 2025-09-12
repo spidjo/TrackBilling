@@ -79,7 +79,7 @@ def lazy_import(view_name: str):
         "tenant_manager": "views.superadmin.tenant_manager",
         "render_admin_analytics_dashboard": "views.superadmin.admin_analytics_dashboard",
         "resend_log_view": "views.superadmin.resend_log_view",
-        "start_scheduler": "monthly_report_scheduler",
+        "start_scheduler": "monthly_report",
         "render_anomaly_dashboard": "views.superadmin.anomaly_dashboard",
 
         # Admin
