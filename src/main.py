@@ -315,7 +315,7 @@ def main():
         if role_enum == Role.SUPERADMIN:
             if st.button("🚀 Run Monthly Billing", use_container_width=True, type="primary"):
                 with st.spinner("Generating reports..."):
-                    lazy_import("start_scheduler")()
+                    lazy_import("main")()
                     st.toast("Monthly billing reports generated.", icon="✅")
 
         if st.button("🔒 Logout", use_container_width=True, type="secondary"):
