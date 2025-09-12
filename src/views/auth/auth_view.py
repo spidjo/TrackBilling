@@ -148,7 +148,7 @@ def auth_view():
                 unsafe_allow_html=True
             )
         
-        st.markdown(f'<h1 style="text-align: center; color: {theme["TEXT"]};">🔐 SaaS Billing Platform</h1>', 
+        st.markdown(f'<h1 style="text-align: center; color: {theme["TEXT"]};">🔐 SglTrack SaaS Billing Platform</h1>', 
                    unsafe_allow_html=True)
         
         tabs = st.tabs(["Login", "Register"])
