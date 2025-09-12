@@ -5,7 +5,7 @@
 -- Tenants (companies using the platform)
 CREATE TABLE IF NOT EXISTS tenants
 (
-    id integer NOT NULL DEFAULT nextval('tenants_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     name text COLLATE pg_catalog."default" NOT NULL,
     company_name text COLLATE pg_catalog."default",
     address text COLLATE pg_catalog."default",
@@ -19,14 +19,13 @@ CREATE TABLE IF NOT EXISTS tenants
     stripe_account_id character varying(30) COLLATE pg_catalog."default",
     billing_contact text COLLATE pg_catalog."default",
     vat_number text COLLATE pg_catalog."default",
-    tax_id text COLLATE pg_catalog."default",
-    CONSTRAINT tenants_pkey PRIMARY KEY (id)
+    tax_id text COLLATE pg_catalog."default"
 );
 
 -- Users (SuperAdmin, Admin, Client)
 CREATE TABLE IF NOT EXISTS users
 (
-    id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer,
     first_name text COLLATE pg_catalog."default" NOT NULL,
     last_name text COLLATE pg_catalog."default" NOT NULL,
@@ -44,7 +43,6 @@ CREATE TABLE IF NOT EXISTS users
     token_timestamp timestamp without time zone,
     phone text COLLATE pg_catalog."default",
     billing_address text COLLATE pg_catalog."default",
-    CONSTRAINT users_pkey PRIMARY KEY (id),
     CONSTRAINT users_username_key UNIQUE (username),
     CONSTRAINT users_tenant_id_fkey FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
@@ -56,7 +54,7 @@ CREATE TABLE IF NOT EXISTS users
 -- Plans (subscription offerings)
 CREATE TABLE IF NOT EXISTS plans
 (
-    id integer NOT NULL DEFAULT nextval('plans_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer NOT NULL,
     name text COLLATE pg_catalog."default" NOT NULL,
     description text COLLATE pg_catalog."default",
@@ -66,7 +64,6 @@ CREATE TABLE IF NOT EXISTS plans
     is_active boolean DEFAULT true,
     billing_cycle text COLLATE pg_catalog."default" NOT NULL DEFAULT 'monthly'::text,
     start_date date NOT NULL DEFAULT CURRENT_DATE,
-    CONSTRAINT plans_pkey PRIMARY KEY (id),
     CONSTRAINT plans_tenant_id_fkey FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -76,16 +73,15 @@ CREATE TABLE IF NOT EXISTS plans
 -- Subscriptions
 CREATE TABLE IF NOT EXISTS subscriptions
 (
-    id integer NOT NULL DEFAULT nextval('subscriptions_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     user_id integer NOT NULL,
     plan_id integer NOT NULL,
     tenant_id integer NOT NULL,
     start_date date DEFAULT CURRENT_DATE,
     end_date date,
     is_active boolean DEFAULT true,
-    CONSTRAINT subscriptions_pkey PRIMARY KEY (id),
     CONSTRAINT subscriptions_plan_id_fkey FOREIGN KEY (plan_id)
-        REFERENCES public.plans (id) MATCH SIMPLE
+        REFERENCES plans (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE NO ACTION,
     CONSTRAINT subscriptions_tenant_id_fkey FOREIGN KEY (tenant_id)
@@ -102,13 +98,12 @@ CREATE TABLE IF NOT EXISTS subscriptions
 -- Plan Metrics table to define metrics associated with each plan
 CREATE TABLE IF NOT EXISTS plan_metrics
 (
-    id integer NOT NULL DEFAULT nextval('plan_metrics_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     plan_id integer,
     metric_name text COLLATE pg_catalog."default",
     included_units integer,
     overage_rate numeric,
     unit_label text COLLATE pg_catalog."default",
-    CONSTRAINT plan_metrics_pkey PRIMARY KEY (id),
     CONSTRAINT plan_metrics_plan_id_fkey FOREIGN KEY (plan_id)
         REFERENCES plans (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -119,13 +114,12 @@ CREATE TABLE IF NOT EXISTS plan_metrics
 -- plan_metric_limits table to define limits and overage rates for each metric in a plan
 CREATE TABLE IF NOT EXISTS plan_metric_limits
 (
-    id integer NOT NULL DEFAULT nextval('plan_metric_limits_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     plan_id integer NOT NULL,
     metric_id integer NOT NULL,
     metric_limit integer NOT NULL DEFAULT 0,
     included_units integer NOT NULL DEFAULT 0,
     overage_rate numeric NOT NULL DEFAULT 0.0,
-    CONSTRAINT plan_metric_limits_pkey PRIMARY KEY (id),
     CONSTRAINT plan_metric_limits_plan_id_metric_id_key UNIQUE (plan_id, metric_id),
     CONSTRAINT plan_metric_limits_metric_id_fkey FOREIGN KEY (metric_id)
         REFERENCES usage_metrics (id) MATCH SIMPLE
@@ -140,7 +134,7 @@ CREATE TABLE IF NOT EXISTS plan_metric_limits
 
 CREATE TABLE IF NOT EXISTS usage_metrics
 (
-    id integer NOT NULL DEFAULT nextval('usage_metrics_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer NOT NULL,
     usage_date date NOT NULL DEFAULT CURRENT_DATE,
     name text COLLATE pg_catalog."default" NOT NULL,
@@ -150,7 +144,6 @@ CREATE TABLE IF NOT EXISTS usage_metrics
     usage_amount integer NOT NULL DEFAULT 0,
     created_at date DEFAULT CURRENT_DATE,
     description text COLLATE pg_catalog."default",
-    CONSTRAINT usage_metrics_pkey PRIMARY KEY (id),
     CONSTRAINT usage_metrics_tenant_id_fkey FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -160,7 +153,7 @@ CREATE TABLE IF NOT EXISTS usage_metrics
 
 CREATE TABLE IF NOT EXISTS usage_records
 (
-    id integer NOT NULL DEFAULT nextval('usage_records_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer NOT NULL,
     user_id integer NOT NULL,
     metric_id integer NOT NULL,
@@ -168,7 +161,6 @@ CREATE TABLE IF NOT EXISTS usage_records
     metric_name text COLLATE pg_catalog."default" NOT NULL DEFAULT 'default_metric'::text,
     usage_date date NOT NULL,
     recorded_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT usage_records_pkey PRIMARY KEY (id),
     CONSTRAINT usage_records_tenant_id_fkey FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -182,14 +174,13 @@ CREATE TABLE IF NOT EXISTS usage_records
 
 CREATE TABLE IF NOT EXISTS subscription_audit
 (
-    id integer NOT NULL DEFAULT nextval('subscription_audit_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     user_id integer NOT NULL,
     tenant_id integer NOT NULL,
     action text COLLATE pg_catalog."default" NOT NULL,
     old_plan_id integer,
     new_plan_id integer,
     "timestamp" timestamp without time zone NOT NULL,
-    CONSTRAINT subscription_audit_pkey PRIMARY KEY (id),
     CONSTRAINT subscription_audit_new_plan_id_fkey FOREIGN KEY (new_plan_id)
         REFERENCES plans (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -211,7 +202,7 @@ CREATE TABLE IF NOT EXISTS subscription_audit
 
 CREATE TABLE IF NOT EXISTS invoices
 (
-    id integer NOT NULL DEFAULT nextval('invoices_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer NOT NULL,
     user_id integer NOT NULL,
     period_start date NOT NULL,
@@ -233,7 +224,6 @@ CREATE TABLE IF NOT EXISTS invoices
     total_invoiced numeric NOT NULL DEFAULT 0,
     total_paid numeric NOT NULL DEFAULT 0,
     balance numeric NOT NULL DEFAULT 0,
-    CONSTRAINT invoices_pkey PRIMARY KEY (id),
     CONSTRAINT invoices_tenant_id_fkey FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -247,14 +237,13 @@ CREATE TABLE IF NOT EXISTS invoices
 
 CREATE TABLE IF NOT EXISTS invoice_items
 (
-    id integer NOT NULL DEFAULT nextval('invoice_items_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     invoice_id integer NOT NULL,
     description text COLLATE pg_catalog."default",
     quantity integer NOT NULL,
     unit_price numeric NOT NULL,
     total_price numeric NOT NULL,
     created_at date DEFAULT CURRENT_DATE,
-    CONSTRAINT invoice_items_pkey PRIMARY KEY (id),
     CONSTRAINT invoice_items_invoice_id_fkey FOREIGN KEY (invoice_id)
         REFERENCES invoices (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -264,19 +253,18 @@ CREATE TABLE IF NOT EXISTS invoice_items
 
 CREATE TABLE IF NOT EXISTS alerts
 (
-    id integer NOT NULL DEFAULT nextval('alerts_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer NOT NULL,
     user_id integer NOT NULL,
     metric_id integer NOT NULL,
     alert_type character varying(50) COLLATE pg_catalog."default" NOT NULL,
     message text COLLATE pg_catalog."default",
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT alerts_pkey PRIMARY KEY (id)
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS anomalies
 (
-    id integer NOT NULL DEFAULT nextval('anomalies_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer NOT NULL,
     user_id integer,
     subscription_id integer,
@@ -294,7 +282,6 @@ CREATE TABLE IF NOT EXISTS anomalies
     severity text COLLATE pg_catalog."default" DEFAULT 'low'::text,
     status text COLLATE pg_catalog."default" DEFAULT 'unresolved'::text,
     assigned_to integer,
-    CONSTRAINT anomalies_pkey PRIMARY KEY (id),
     CONSTRAINT anomalies_acknowledged_by_fkey FOREIGN KEY (acknowledged_by)
         REFERENCES users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -330,14 +317,13 @@ CREATE TABLE IF NOT EXISTS anomalies
 
 CREATE TABLE IF NOT EXISTS anomaly_logs
 (
-    id integer NOT NULL DEFAULT nextval('anomaly_logs_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     anomaly_id integer NOT NULL,
     action text COLLATE pg_catalog."default" NOT NULL,
     performed_by integer NOT NULL,
     assigned_to integer,
     comment text COLLATE pg_catalog."default",
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT anomaly_logs_pkey PRIMARY KEY (id),
     CONSTRAINT anomaly_logs_anomaly_id_fkey FOREIGN KEY (anomaly_id)
         REFERENCES anomalies (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -356,7 +342,7 @@ CREATE TABLE IF NOT EXISTS anomaly_logs
 
 CREATE TABLE IF NOT EXISTS audit_log
 (
-    id bigint NOT NULL DEFAULT nextval('audit_log_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     event_time timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     user_id integer,
     tenant_id integer,
@@ -368,7 +354,6 @@ CREATE TABLE IF NOT EXISTS audit_log
     user_agent text COLLATE pg_catalog."default",
     metadata jsonb,
     status character varying(20) COLLATE pg_catalog."default",
-    CONSTRAINT audit_log_pkey PRIMARY KEY (id),
     CONSTRAINT fk_audit_tenant FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -382,7 +367,7 @@ CREATE TABLE IF NOT EXISTS audit_log
 
 CREATE TABLE IF NOT EXISTS feature_usage
 (
-    id integer NOT NULL DEFAULT nextval('feature_usage_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     user_id integer NOT NULL,
     tenant_id integer NOT NULL,
     feature_name character varying(100) COLLATE pg_catalog."default" NOT NULL,
@@ -390,7 +375,6 @@ CREATE TABLE IF NOT EXISTS feature_usage
     usage_count integer DEFAULT 1,
     duration_seconds integer,
     additional_metadata jsonb,
-    CONSTRAINT feature_usage_pkey PRIMARY KEY (id),
     CONSTRAINT fk_tenant FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -414,14 +398,13 @@ CREATE TABLE IF NOT EXISTS invoice_generation_log
 
 CREATE TABLE IF NOT EXISTS password_resets
 (
-    id integer NOT NULL DEFAULT nextval('password_resets_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     user_id integer,
     email text COLLATE pg_catalog."default",
     token text COLLATE pg_catalog."default",
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     is_used boolean DEFAULT false,
     expires_at timestamp with time zone,
-    CONSTRAINT password_resets_pkey PRIMARY KEY (id),
     CONSTRAINT password_resets_user_id_fkey FOREIGN KEY (user_id)
         REFERENCES users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -431,7 +414,7 @@ CREATE TABLE IF NOT EXISTS password_resets
 
 CREATE TABLE IF NOT EXISTS payments
 (
-    id integer NOT NULL DEFAULT nextval('payments_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     user_id integer,
     invoice_id integer,
     amount numeric,
@@ -442,7 +425,6 @@ CREATE TABLE IF NOT EXISTS payments
     is_verified boolean DEFAULT false,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     verified_at date,
-    CONSTRAINT payments_pkey PRIMARY KEY (id),
     CONSTRAINT payments_invoice_id_fkey FOREIGN KEY (invoice_id)
         REFERENCES invoices (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -455,7 +437,7 @@ CREATE TABLE IF NOT EXISTS payments
 
 CREATE TABLE IF NOT EXISTS usage_metrics
 (
-    id integer NOT NULL DEFAULT nextval('usage_metrics_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer NOT NULL,
     usage_date date NOT NULL DEFAULT CURRENT_DATE,
     name text COLLATE pg_catalog."default" NOT NULL,
@@ -465,7 +447,6 @@ CREATE TABLE IF NOT EXISTS usage_metrics
     usage_amount integer NOT NULL DEFAULT 0,
     created_at date DEFAULT CURRENT_DATE,
     description text COLLATE pg_catalog."default",
-    CONSTRAINT usage_metrics_pkey PRIMARY KEY (id),
     CONSTRAINT usage_metrics_tenant_id_fkey FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -474,7 +455,7 @@ CREATE TABLE IF NOT EXISTS usage_metrics
 
 CREATE TABLE IF NOT EXISTS usage_records
 (
-    id integer NOT NULL DEFAULT nextval('usage_records_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     tenant_id integer NOT NULL,
     user_id integer NOT NULL,
     metric_id integer NOT NULL,
@@ -482,7 +463,6 @@ CREATE TABLE IF NOT EXISTS usage_records
     metric_name text COLLATE pg_catalog."default" NOT NULL DEFAULT 'default_metric'::text,
     usage_date date NOT NULL,
     recorded_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT usage_records_pkey PRIMARY KEY (id),
     CONSTRAINT usage_records_tenant_id_fkey FOREIGN KEY (tenant_id)
         REFERENCES tenants (id) MATCH SIMPLE
         ON UPDATE NO ACTION
@@ -495,13 +475,12 @@ CREATE TABLE IF NOT EXISTS usage_records
 
 CREATE TABLE IF NOT EXISTS plan_metric_limits
 (
-    id integer NOT NULL DEFAULT nextval('plan_metric_limits_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     plan_id integer NOT NULL,
     metric_id integer NOT NULL,
     metric_limit integer NOT NULL DEFAULT 0,
     included_units integer NOT NULL DEFAULT 0,
     overage_rate numeric NOT NULL DEFAULT 0.0,
-    CONSTRAINT plan_metric_limits_pkey PRIMARY KEY (id),
     CONSTRAINT plan_metric_limits_plan_id_metric_id_key UNIQUE (plan_id, metric_id),
     CONSTRAINT plan_metric_limits_metric_id_fkey FOREIGN KEY (metric_id)
         REFERENCES usage_metrics (id) MATCH SIMPLE
@@ -515,13 +494,12 @@ CREATE TABLE IF NOT EXISTS plan_metric_limits
 
 CREATE TABLE IF NOT EXISTS plan_metrics
 (
-    id integer NOT NULL DEFAULT nextval('plan_metrics_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     plan_id integer,
     metric_name text COLLATE pg_catalog."default",
     included_units integer,
     overage_rate numeric,
     unit_label text COLLATE pg_catalog."default",
-    CONSTRAINT plan_metrics_pkey PRIMARY KEY (id),
     CONSTRAINT plan_metrics_plan_id_fkey FOREIGN KEY (plan_id)
         REFERENCES plans (id) MATCH SIMPLE
         ON UPDATE NO ACTION
