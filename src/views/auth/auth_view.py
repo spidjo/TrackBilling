@@ -215,13 +215,18 @@ def handle_login(username, password):
     
     if result == "unverified":
         st.warning("⚠️ Your account is not verified. Please check your email.")
-        if st.button("Resend Verification Email"):
-            with st.spinner("Sending verification email..."):
-                resend_result = resend_verification_email(username)
-            if resend_result["success"]:
-                st.success("📨 Verification email resent. Please check your inbox.")
-            else:
-                st.error(f"Error: {resend_result['error']}")
+
+        # Use a form here to avoid st.button conflict
+        with st.form("resend_verification_form"):
+            resend = st.form_submit_button("📨 Resend Verification Email")
+            if resend:
+                with st.spinner("Sending verification email..."):
+                    resend_result = resend_verification_email(username)
+                if resend_result["success"]:
+                    st.success("✅ Verification email resent. Please check your inbox.")
+                else:
+                    st.error(f"❌ Error: {resend_result['error']}")
+    
     elif result is True:
         st.session_state.update({
             "authenticated": True,
