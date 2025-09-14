@@ -7,29 +7,12 @@ from auth_manager import (
     verify_token,
     resend_verification_email
 )
+from main import LIGHT_THEME, DARK_THEME
 from utils.session import init_session_state
 from db.database import get_db_connection
 from utils.login_attempts import is_rate_limited
 import base64
 
-# --- Theme Colors ---
-LIGHT_THEME = {
-    "PRIMARY": "#e8f5e9",
-    "SECONDARY": "#c8e6c9",
-    "ACCENT": "#ff5252",
-    "TEXT": "#263238",
-    "BG": "#ffffff",
-    "CARD": "#f8f9fa"
-}
-
-DARK_THEME = {
-    "PRIMARY": "#1e3a21",
-    "SECONDARY": "#2d4d32",
-    "ACCENT": "#ff6b6b",
-    "TEXT": "#f5f5f5",
-    "BG": "#121212",
-    "CARD": "#1e1e1e"
-}
 
 def get_logo_base64():
     # Replace with your actual logo path or base64 encoded string
