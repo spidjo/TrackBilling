@@ -14,7 +14,7 @@ SMTP_SERVER = os.getenv("EMAIL_HOST", "mail.privateemail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SENDER_EMAIL = os.getenv("EMAIL_HOST_USER")
 SENDER_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-APP_URL = os.getenv("APP_URL", "https://sgltrack.com:8501")
+APP_URL = os.getenv("APP_URL", "https://sgltrack.com")
 
 # Setup Jinja2 template environment
 templates_env = Environment(
@@ -23,7 +23,7 @@ templates_env = Environment(
 )
 def send_verification_email(to_email, username, token): 
     verify_url = f"{APP_URL}?verify={token}"
-    app_name = os.getenv("APP_NAME", "TrackBilling")
+    app_name = os.getenv("APP_NAME", "SglTrack")
     # Render HTML content from template
     template = templates_env.get_template("email_verification.html")
     html_content = template.render(username=username, verify_url=verify_url, app_name=app_name)
