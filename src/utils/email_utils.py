@@ -17,12 +17,12 @@ from utils.report_utils import generate_tenant_billing_report_pdf
 load_dotenv()
 
 # Email configuration
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-EMAIL_SENDER = os.getenv("EMAIL_SENDER", EMAIL_USER)
-APP_URL = os.getenv("APP_URL", "http://localhost:8501")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.privateemail.com")
+EMAIL_PORT = int(os.getenv("SMTP_PORT", 587))
+EMAIL_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_SENDER = os.getenv("EMAIL_HOST_USER", EMAIL_USER)
+APP_URL = os.getenv("APP_URL", "https://sgltrack.com:8501")
 
 # Jinja2 template environment
 templates_env = Environment(

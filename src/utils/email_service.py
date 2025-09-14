@@ -10,11 +10,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+SMTP_SERVER = os.getenv("EMAIL_HOST", "mail.privateemail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
-APP_URL = os.getenv("APP_URL", "http://localhost:8501")
+SENDER_EMAIL = os.getenv("EMAIL_HOST_USER")
+SENDER_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+APP_URL = os.getenv("APP_URL", "https://sgltrack.com:8501")
 
 # Setup Jinja2 template environment
 templates_env = Environment(
