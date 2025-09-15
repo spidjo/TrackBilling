@@ -138,25 +138,29 @@ def auth_view():
         
         # --- Login Tab ---
         with tabs[0]:
+            # --- Login Form ---
             with st.form("login_form", clear_on_submit=False):
                 st.markdown(f'<h3 style="color: {theme["TEXT"]};">Welcome Back</h3>', 
-                          unsafe_allow_html=True)
-                
+                            unsafe_allow_html=True)
+
                 username = st.text_input("Username", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
-                
+
                 st.markdown(
                     f"""<div style="text-align: right; margin: 1rem 0 1.5rem 0;">
                     <a href="/reset_password_request?reset=1" target="_self" 
-                       style="color: {theme["ACCENT"]}; text-decoration: none;">
+                    style="color: {theme["ACCENT"]}; text-decoration: none;">
                         Forgot password?
                     </a>
                     </div>""",
                     unsafe_allow_html=True
                 )
-                
-                if st.form_submit_button("Login", type="primary"):
-                    handle_login(username, password)
+
+                login_submitted = st.form_submit_button("Login", type="primary")
+
+            # --- Handle Login Result OUTSIDE the form ---
+            if login_submitted:
+                handle_login(username, password)
         
         # --- Register Tab ---
         with tabs[1]:
@@ -216,16 +220,14 @@ def handle_login(username, password):
     if result == "unverified":
         st.warning("⚠️ Your account is not verified. Please check your email.")
 
-        # Render a button outside of the login form
-        if st.session_state.get("show_resend", True):  
-            if st.button("📨 Resend Verification Email", key="resend_verif"):
-                with st.spinner("Sending verification email..."):
-                    resend_result = resend_verification_email(username)
-                if resend_result["success"]:
-                    st.success("✅ Verification email resent. Please check your inbox.")
-                    st.session_state["show_resend"] = False  # hide button after success
-                else:
-                    st.error(f"❌ Error: {resend_result['error']}")
+        # Safe: this is not inside a form
+        if st.button("📨 Resend Verification Email", key="resend_verif_button"):
+            with st.spinner("Sending verification email..."):
+                resend_result = resend_verification_email(username)
+            if resend_result["success"]:
+                st.success("✅ Verification email resent. Please check your inbox.")
+            else:
+                st.error(f"❌ Error: {resend_result['error']}")
 
     elif result is True:
         st.session_state.update({
@@ -243,6 +245,7 @@ def handle_login(username, password):
         st.rerun()
     else:
         st.error("❌ Invalid username or password.")
+
 
 def show_password_strength(password, theme):
     """Visual feedback for password strength"""
