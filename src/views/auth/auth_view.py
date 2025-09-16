@@ -1,6 +1,8 @@
+# auth_view.py
 import time
 import streamlit as st
 import psycopg2.extras
+import logging
 from auth_manager import (
     register_user,
     authenticate_user,
@@ -13,6 +15,9 @@ from db.database import get_db_connection
 from utils.login_attempts import is_rate_limited
 import base64
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def get_logo_base64():
     # Replace with your actual logo path or base64 encoded string
@@ -107,7 +112,11 @@ def fetch_tenants():
     return tenants
 
 def auth_view():
+    logger.info(f"Session state at start: {dict(st.session_state)}")
+    
     init_session_state()
+    
+    logger.info(f"Session state after init: {dict(st.session_state)}")
     
     # Theme setup
     dark_mode = st.session_state.get("dark_mode", False)
@@ -138,29 +147,39 @@ def auth_view():
         
         # --- Login Tab ---
         with tabs[0]:
-            # --- Login Form ---
             with st.form("login_form", clear_on_submit=False):
-                st.markdown(f'<h3 style="color: {theme["TEXT"]};">Welcome Back</h3>', 
-                            unsafe_allow_html=True)
-
                 username = st.text_input("Username", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
-
-                st.markdown(
-                    f"""<div style="text-align: right; margin: 1rem 0 1.5rem 0;">
-                    <a href="/reset_password_request?reset=1" target="_self" 
-                    style="color: {theme["ACCENT"]}; text-decoration: none;">
-                        Forgot password?
-                    </a>
-                    </div>""",
-                    unsafe_allow_html=True
-                )
-
                 login_submitted = st.form_submit_button("Login", type="primary")
 
-            # --- Handle Login Result OUTSIDE the form ---
+            # --- Handle login result ---
             if login_submitted:
                 handle_login(username, password)
+
+            # --- Render resend button for unverified users ---
+            if "unverified_user" in st.session_state:
+                unverified_username = st.session_state["unverified_user"]
+                logger.info(f"Rendering resend button for: {unverified_username}")
+                
+                resend_key = f"resend_{unverified_username}"
+                resend_clicked = st.button(
+                    "📨 Resend Verification Email",
+                    key=resend_key
+                )
+                logger.info(f"Button created with key: {resend_key}, clicked: {resend_clicked}")
+                
+                if resend_clicked:
+                    logger.info(f"Resend verification email button CLICKED for: {unverified_username}")
+                    logger.info(f"Resend verification email requested for: {unverified_username}")
+                    with st.spinner("Sending verification email..."):
+                        resend_result = resend_verification_email(unverified_username)
+                    if resend_result.get("success"):
+                        st.success("✅ Verification email resent. Please check your inbox.")
+                        logger.info(f"Verification email resent successfully for: {unverified_username}")
+                    else:
+                        error_msg = resend_result.get("error", "Unknown error")
+                        st.error(f"❌ Error: {error_msg}")
+                        logger.error(f"Failed to resend verification email for {unverified_username}: {error_msg}")
         
         # --- Register Tab ---
         with tabs[1]:
@@ -209,26 +228,20 @@ def auth_view():
     
     st.markdown('</div>', unsafe_allow_html=True)
 
+# --- handle login ---
 def handle_login(username, password):
+    logger.info(f"Login attempt for user: {username}")
     if is_rate_limited(username):
         st.error("🚫 Too many login attempts. Please try again later.")
         return
-    
+
     with st.spinner("Authenticating..."):
         result, role, tenant_id, user_id = authenticate_user(username, password) 
-    
+
+    # store unverified state
     if result == "unverified":
+        st.session_state["unverified_user"] = username
         st.warning("⚠️ Your account is not verified. Please check your email.")
-
-        # Safe: this is not inside a form
-        if st.button("📨 Resend Verification Email", key="resend_verif_button"):
-            with st.spinner("Sending verification email..."):
-                resend_result = resend_verification_email(username)
-            if resend_result["success"]:
-                st.success("✅ Verification email resent. Please check your inbox.")
-            else:
-                st.error(f"❌ Error: {resend_result['error']}")
-
     elif result is True:
         st.session_state.update({
             "authenticated": True,
@@ -245,7 +258,6 @@ def handle_login(username, password):
         st.rerun()
     else:
         st.error("❌ Invalid username or password.")
-
 
 def show_password_strength(password, theme):
     """Visual feedback for password strength"""
