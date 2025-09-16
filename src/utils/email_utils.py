@@ -19,7 +19,7 @@ load_dotenv()
 # SendGrid configuration
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 SENDER_EMAIL = os.getenv("EMAIL_HOST_USER", "admin@sgltrack.com")
-APP_URL = os.getenv("APP_URL", "https://sgltrack.com")
+APP_URL = os.getenv("APP_URL", "https://app.sgltrack.com")
 APP_NAME = os.getenv("APP_NAME", "SglTrack")
 
 # Jinja2 template environment
