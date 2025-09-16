@@ -6,6 +6,7 @@ import secrets
 import socket
 import logging
 from datetime import datetime, timedelta
+from dateutil import parser
 from email_validator import validate_email, EmailNotValidError
 from functools import lru_cache
 from db.database import get_db_connection
@@ -188,7 +189,7 @@ def resend_verification_email(username: str) -> dict:
         
         # Get user details
         cursor.execute("""
-            SELECT id, email, first_name, is_verified, last_verification_sent 
+            SELECT id, email, first_name, is_verified, last_verification_sent::timestamptz AS last_verification_sent 
             FROM users 
             WHERE username = %s
         """, (username,))
@@ -207,13 +208,16 @@ def resend_verification_email(username: str) -> dict:
             return {"success": False, "error": "User is already verified"}
         
         # Check resend cooldown (15 minutes)
-        if last_sent and (datetime.utcnow() - last_sent) < timedelta(minutes=15):
-            remaining = timedelta(minutes=15) - (datetime.utcnow() - last_sent)
-            logger.warning(f"Resend cooldown active for {username}. Remaining: {remaining}")
-            return {
-                "success": False,
-                "error": "Please wait 15 minutes before requesting another verification email"
-            }
+        if last_sent:
+            if isinstance(last_sent, str):
+                last_sent = parser.isoparse(last_sent)  # convert ISO string to datetime
+            # now safe to subtract
+            if (datetime.utcnow() - last_sent) < timedelta(minutes=15):
+                remaining = timedelta(minutes=15) - (datetime.utcnow() - last_sent)
+                return {
+                    "success": False,
+                    "error": "Please wait 15 minutes before requesting another verification email"
+                }
         
         # Generate new token
         new_token = secrets.token_urlsafe(32)
