@@ -1,28 +1,26 @@
 # utils/email_utils.py
 
-import smtplib
 from datetime import datetime    
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
-from venv import logger
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from datetime import datetime
-from pathlib import Path
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, To, Content, Attachment, FileContent, FileName, FileType, Disposition
+import base64
 from dotenv import load_dotenv
 import os
 from db.database import get_db_connection
 from utils.report_utils import generate_tenant_billing_report_pdf
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# Email configuration
-EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.privateemail.com")
-EMAIL_PORT = int(os.getenv("SMTP_PORT", 587))
-EMAIL_USER = os.getenv("EMAIL_HOST_USER","admin@sgltrack.com")
-EMAIL_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-EMAIL_SENDER = os.getenv("EMAIL_HOST_USER", EMAIL_USER)
+# SendGrid configuration
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDER_EMAIL = os.getenv("EMAIL_HOST_USER", "admin@sgltrack.com")
 APP_URL = os.getenv("APP_URL", "https://sgltrack.com")
+APP_NAME = os.getenv("APP_NAME", "SglTrack")
 
 # Jinja2 template environment
 templates_env = Environment(
@@ -36,62 +34,81 @@ def render_email_template(template_name, **context):
     return template.render(
         **context,
         year=datetime.now().year,
-        app_url=APP_URL
+        app_url=APP_URL,
+        app_name=APP_NAME
     )
 
 def send_email(to_email, subject, body_text, body_html=None):
     """
-    Send an email with optional HTML content
+    Send an email using SendGrid API
     """
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_SENDER
-    msg["To"] = to_email
-
-    # Attach plain text version
-    msg.attach(MIMEText(body_text, "plain"))
-
-    # Attach HTML version if provided
-    if body_html:
-        msg.attach(MIMEText(body_html, "html"))
+    if not SENDGRID_API_KEY:
+        logger.error("SendGrid API key not configured")
+        return False
 
     try:
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASSWORD)
-            server.send_message(msg)
-        return True
+        message = Mail(
+            from_email=Email(SENDER_EMAIL),
+            to_emails=To(to_email),
+            subject=subject,
+            plain_text_content=Content("text/plain", body_text)
+        )
+        
+        if body_html:
+            message.add_content(Content("text/html", body_html))
+        
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        
+        if response.status_code in [200, 202]:
+            logger.info(f"✅ Email sent successfully to {to_email}")
+            return True
+        else:
+            logger.error(f"❌ SendGrid API error: {response.status_code} - {response.body}")
+            return False
+            
     except Exception as e:
-        print(f"❌ Error sending email to {to_email}: {e}")
+        logger.error(f"❌ Error sending email to {to_email}: {e}")
         return False
 
 def send_email_with_attachment(to_email, subject, body_text, filename, file_bytes, body_html=None):
-    """Send an email with an attachment"""
-    msg = MIMEMultipart("mixed")
-    msg["From"] = EMAIL_SENDER
-    msg["To"] = to_email
-    msg["Subject"] = subject
-
-    # Create alternative part for text/HTML
-    alternative = MIMEMultipart("alternative")
-    alternative.attach(MIMEText(body_text, "plain"))
-    if body_html:
-        alternative.attach(MIMEText(body_html, "html"))
-    msg.attach(alternative)
-
-    # Attach file
-    attachment = MIMEApplication(file_bytes, Name=filename)
-    attachment["Content-Disposition"] = f'attachment; filename="{filename}"'
-    msg.attach(attachment)
+    """Send an email with an attachment using SendGrid"""
+    if not SENDGRID_API_KEY:
+        logger.error("SendGrid API key not configured")
+        return False
 
     try:
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASSWORD)
-            server.send_message(msg)
-        return True
+        message = Mail(
+            from_email=Email(SENDER_EMAIL),
+            to_emails=To(to_email),
+            subject=subject,
+            plain_text_content=Content("text/plain", body_text)
+        )
+        
+        if body_html:
+            message.add_content(Content("text/html", body_html))
+        
+        # Create attachment
+        encoded_file = base64.b64encode(file_bytes).decode()
+        attachment = Attachment()
+        attachment.file_content = FileContent(encoded_file)
+        attachment.file_type = FileType('application/pdf')
+        attachment.file_name = FileName(filename)
+        attachment.disposition = Disposition('attachment')
+        message.attachment = attachment
+        
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        
+        if response.status_code in [200, 202]:
+            logger.info(f"✅ Email with attachment sent successfully to {to_email}")
+            return True
+        else:
+            logger.error(f"❌ SendGrid API error: {response.status_code} - {response.body}")
+            return False
+            
     except Exception as e:
-        print(f"❌ Error sending email with attachment to {to_email}: {e}")
+        logger.error(f"❌ Error sending email with attachment to {to_email}: {e}")
         return False
 
 def email_billing_report_to_admin(tenant_id, start_date, end_date):
@@ -174,7 +191,7 @@ def email_billing_report_to_admin(tenant_id, start_date, end_date):
 
 def send_payment_verified_email(to_email, username, amount, invoice_id, invoice_date, tenant_name):
     """Send payment verification confirmation email"""
-    print(f"Sending payment verification email to {to_email} for invoice {invoice_id}")
+    logger.info(f"Sending payment verification email to {to_email} for invoice {invoice_id}")
     subject = f"💰 Payment Verified for Invoice #{invoice_id}"
     
     html_body = render_email_template(
@@ -222,17 +239,17 @@ def send_usage_alert_email(to_email, username, metric_name, usage, limit):
     # Calculate the percentage used
     percent_used = min(100, (usage / limit) * 100) if limit else 0
     
-    print(f"Sending usage alert email to {to_email} for {metric_name} usage")
+    logger.info(f"Sending usage alert email to {to_email} for {metric_name} usage")
     html_body = render_email_template(
         "usage_alert.html",
         username=username,
         metric_name=metric_name,
         usage=usage,
         limit=limit,
-        percent_used=percent_used,  # Add this
-        plan_limit=limit,           # Add this if needed
-        current_usage=usage,       # Add this if needed
-        app_name="Your App Name"   # Add your app name here
+        percent_used=percent_used,
+        plan_limit=limit,
+        current_usage=usage,
+        app_name=APP_NAME
     )
     
     text_body = (
@@ -242,9 +259,30 @@ def send_usage_alert_email(to_email, username, metric_name, usage, limit):
         "Please consider upgrading your plan."
     )
 
-    print(f'about to send email to {to_email} for {metric_name} usage')
+    logger.info(f'About to send email to {to_email} for {metric_name} usage')
     result = send_email(to_email, subject, text_body, html_body)
     if result:
-        print(f"✅ Usage alert email sent to {to_email} for {metric_name} usage")
+        logger.info(f"✅ Usage alert email sent to {to_email} for {metric_name} usage")
     else:
-        print(f"❌ Failed to send usage alert email to {to_email} for {metric_name} usage")
+        logger.error(f"❌ Failed to send usage alert email to {to_email} for {metric_name} usage")
+    return result
+
+def send_verification_email(to_email, username, token):
+    """Send account verification email"""
+    subject = "✅ Verify Your Account"
+    verification_url = f"{APP_URL}/verify-email?token={token}"
+    
+    html_body = render_email_template(
+        "verification_email.html",
+        username=username,
+        verification_url=verification_url
+    )
+    
+    text_body = (
+        f"Hi {username},\n\n"
+        f"Welcome to {APP_NAME}! Please verify your email address by clicking this link:\n"
+        f"{verification_url}\n\n"
+        "This link will expire in 24 hours."
+    )
+    
+    return send_email(to_email, subject, text_body, html_body)
