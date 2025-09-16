@@ -5,7 +5,7 @@ import psycopg2.extras
 import secrets
 import socket
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil import parser
 from email_validator import validate_email, EmailNotValidError
 from functools import lru_cache
@@ -210,10 +210,11 @@ def resend_verification_email(username: str) -> dict:
         # Check resend cooldown (15 minutes)
         if last_sent:
             if isinstance(last_sent, str):
-                last_sent = parser.isoparse(last_sent)  # convert ISO string to datetime
-            # now safe to subtract
-            if (datetime.utcnow() - last_sent) < timedelta(minutes=15):
-                remaining = timedelta(minutes=15) - (datetime.utcnow() - last_sent)
+                last_sent = parser.isoparse(last_sent)
+            # ensure last_sent is timezone-aware (should already be with timestamptz)
+            now = datetime.now(timezone.utc)  # timezone-aware current time
+            if (now - last_sent) < timedelta(minutes=15):
+                remaining = timedelta(minutes=15) - (now - last_sent)
                 return {
                     "success": False,
                     "error": "Please wait 15 minutes before requesting another verification email"
@@ -230,7 +231,7 @@ def resend_verification_email(username: str) -> dict:
             SET verification_token = %s,
                 last_verification_sent = %s
             WHERE id = %s
-        """, (new_token, now, user_id))
+        """, (new_token, now, user_id)) 
         
         # Send verification email
         logger.info(f"Sending verification email to {email}")
