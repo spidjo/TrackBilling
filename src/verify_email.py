@@ -1,12 +1,12 @@
 # src/verify_email.py
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from src.auth_manager import verify_token
+from src.auth_manager import verify_token  # ✅ fixed import
 
 app = FastAPI(title="SglTrack Email Verification")
 
-# Optional: allow cross-origin requests from your frontend domain
+# Allow cross-origin requests from your frontend domain
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://sgltrack.com"],
