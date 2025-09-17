@@ -24,6 +24,7 @@ def verify_email(token: str):
     """
     result = verify_token(token)
     if result["success"]:
+        logger.info(f"Email verified successfully for token: {token}")
         html_content = """
         <html>
             <head><title>Email Verified</title></head>

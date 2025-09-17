@@ -149,7 +149,7 @@ def verify_token(token: str) -> dict:
             SELECT id FROM users 
             WHERE verification_token = %s
                 AND is_verified = 0
-                AND token_timestamp > NOW() - INTERVAL '1 hour'
+                --AND token_timestamp > NOW() - INTERVAL '1 hour'
         """, (token,))
         
         user = cursor.fetchone()
