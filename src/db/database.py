@@ -3,12 +3,12 @@
 
 import psycopg2
 import psycopg2.extras
-from config import settings
+from src.config import settings
 
 def get_db_connection():
     return psycopg2.connect(
         dbname=settings.DB_NAME,
-        user=settings.DB_USER,
+        user=settings.DB_USER, 
         password=settings.DB_PASSWORD,
         host=settings.DB_HOST,
         options="-c client_encoding=utf8 -c bytea_output=escape",
