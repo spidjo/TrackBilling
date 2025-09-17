@@ -152,6 +152,15 @@ def auth_view():
                 password = st.text_input("Password", type="password", key="login_password")
                 login_submitted = st.form_submit_button("Login", type="primary")
 
+                st.markdown(
+                        f"""<div style="text-align: right; margin: 1rem 0 1.5rem 0;">
+                        <a href="/reset_password_request?reset=1" target="_self" 
+                        style="color: {theme["ACCENT"]}; text-decoration: none;">
+                            Forgot password?
+                        </a>
+                        </div>""",
+                        unsafe_allow_html=True
+                    )
             # --- Handle login result ---
             if login_submitted:
                 handle_login(username, password)

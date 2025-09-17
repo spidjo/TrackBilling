@@ -1,6 +1,10 @@
 import streamlit as st
 from db.database import get_db_connection
 from utils.session_guard import require_login
+import secrets
+import re
+from datetime import datetime, timedelta
+from utils.email_service import send_verification_email
 
 # Custom CSS for styling
 st.markdown("""
@@ -28,6 +32,13 @@ st.markdown("""
         background-color: #e3f2fd;
         color: #1976d2;
     }
+    .admin-form {
+        background-color: #f0f8ff;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 1px solid #b3d9ff;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -42,18 +53,19 @@ def load_tenants():
             FROM tenants t
             LEFT JOIN users u ON t.id = u.tenant_id
             LEFT JOIN subscriptions s ON t.id = s.tenant_id AND s.is_active = TRUE
+            WHERE t.is_active = TRUE
             GROUP BY t.id
             ORDER BY t.name
         """)
         return cursor.fetchall()
 
-def create_tenant(name, industry):
+def create_tenant(name, industry, company_name=None, email=None, phone=None):
     """Create a new tenant with validation"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO tenants (name, industry) VALUES (%s, %s) RETURNING id", 
-            (name, industry)
+            "INSERT INTO tenants (name, industry, company_name, email, phone, is_active) VALUES (%s, %s, %s, %s, %s, TRUE) RETURNING id", 
+            (name, industry, company_name, email, phone)
         )
         tenant_id = cursor.fetchone()[0]
         conn.commit()
@@ -79,6 +91,76 @@ def delete_tenant(tenant_id):
         )
         conn.commit()
 
+def create_tenant_admin(tenant_id, first_name, last_name, email, username):
+    """Create a tenant admin user with verification token"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Generate verification token
+        verification_token = secrets.token_urlsafe(32)
+        token_timestamp = datetime.now()
+        
+        # Create user with temporary password and verification token
+        cursor.execute("""
+            INSERT INTO users 
+            (tenant_id, first_name, last_name, username, email, role, is_active, 
+             verification_token, token_timestamp, is_verified, registration_date)
+            VALUES (%s, %s, %s, %s, %s, 'admin', 1, %s, %s, 0, CURRENT_TIMESTAMP)
+            RETURNING id
+        """, (tenant_id, first_name, last_name, username, email, verification_token, token_timestamp))
+        
+        user_id = cursor.fetchone()[0]
+        conn.commit()
+        
+        return user_id, verification_token
+
+def is_valid_email(email):
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def is_valid_username(username):
+    """Validate username format"""
+    pattern = r'^[a-zA-Z0-9_]{3,50}$'
+    return re.match(pattern, username) is not None
+
+def send_admin_invitation_email(email, first_name, verification_token, tenant_name):
+    """Send invitation email to tenant admin"""
+    try:
+        # Create verification link (adjust URL based on your application)
+        verification_link = f"https://yourapp.com/verify?token={verification_token}"
+        
+        # Email content
+        subject = f"Invitation to join {tenant_name} as Tenant Administrator"
+        message = f"""
+        Dear {first_name},
+        
+        You have been invited to become the Tenant Administrator for {tenant_name}.
+        
+        Please click the link below to set your password and verify your account:
+        {verification_link}
+        
+        This link will expire in 24 hours.
+        
+        If you did not request this invitation, please ignore this email.
+        
+        Best regards,
+        Your Application Team
+        """
+        
+        # Send email
+        send_verification_email(
+            to_email=email,
+            username=first_name,
+            token=verification_token,
+            subject=subject,
+            message=message
+        )
+        return True
+    except Exception as e:
+        st.error(f"Failed to send invitation email: {str(e)}")
+        return False
+
 def tenant_manager():
     """Main tenant management interface"""
     require_login('superadmin')
@@ -90,6 +172,12 @@ def tenant_manager():
     # Load tenant data
     tenants = load_tenants()
     tenant_options = {f"{t[1]} (ID: {t[0]})": t for t in tenants}
+    
+    # Initialize session state for admin creation
+    if 'show_admin_form' not in st.session_state:
+        st.session_state.show_admin_form = False
+    if 'new_tenant_id' not in st.session_state:
+        st.session_state.new_tenant_id = None
     
     # Main form container
     with st.container():
@@ -133,6 +221,27 @@ def tenant_manager():
                 help="Official name of the tenant organization"
             )
             
+            # Additional tenant fields for new tenants
+            if not is_existing:
+                col3, col4 = st.columns(2)
+                with col3:
+                    company_name = st.text_input(
+                        "Company Name",
+                        placeholder="Enter legal company name"
+                    )
+                with col4:
+                    contact_email = st.text_input(
+                        "Contact Email",
+                        placeholder="Primary contact email"
+                    )
+                
+                col5, col6 = st.columns(2)
+                with col5:
+                    phone = st.text_input(
+                        "Phone Number",
+                        placeholder="Contact phone number"
+                    )
+            
             # Form submission
             submitted = st.form_submit_button(
                 "💾 Save Tenant",
@@ -149,11 +258,98 @@ def tenant_manager():
                             update_tenant(tenant_id, name.strip(), industry)
                             st.toast("✅ Tenant updated successfully", icon="✅")
                         else:
-                            create_tenant(name.strip(), industry)
-                            st.toast("✅ Tenant created successfully", icon="✅")
+                            # Create new tenant
+                            new_tenant_id = create_tenant(
+                                name.strip(), 
+                                industry, 
+                                company_name if company_name else name.strip(),
+                                contact_email,
+                                phone
+                            )
+                            st.session_state.new_tenant_id = new_tenant_id
+                            st.session_state.show_admin_form = True
+                            st.toast("✅ Tenant created successfully! Please create the first Tenant Admin.", icon="✅")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error saving tenant: {str(e)}")
+    
+    # Admin creation form (shown after tenant creation)
+    if st.session_state.show_admin_form and st.session_state.new_tenant_id:
+        st.markdown("### Create First Tenant Administrator")
+        with st.form("admin_form"):
+            st.markdown("""
+            <div class='admin-form'>
+                <h4>👥 Tenant Administrator Setup</h4>
+                <p>Create the first administrator account for this tenant. This user will receive an email to set their password and verify their account.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                first_name = st.text_input("First Name", placeholder="Admin's first name")
+            with col2:
+                last_name = st.text_input("Last Name", placeholder="Admin's last name")
+            
+            col3, col4 = st.columns(2)
+            with col3:
+                email = st.text_input("Email Address", placeholder="admin@company.com")
+            with col4:
+                username = st.text_input("Username", placeholder="Choose a username")
+            
+            admin_submitted = st.form_submit_button(
+                "👤 Create Admin & Send Invitation",
+                type="secondary",
+                use_container_width=True
+            )
+            
+            if admin_submitted:
+                # Validate inputs
+                errors = []
+                if not first_name.strip():
+                    errors.append("First name is required")
+                if not last_name.strip():
+                    errors.append("Last name is required")
+                if not email.strip() or not is_valid_email(email):
+                    errors.append("Valid email address is required")
+                if not username.strip() or not is_valid_username(username):
+                    errors.append("Username must be 3-50 characters and contain only letters, numbers, and underscores")
+                
+                if errors:
+                    for error in errors:
+                        st.error(error)
+                else:
+                    try:
+                        # Create admin user
+                        user_id, verification_token = create_tenant_admin(
+                            st.session_state.new_tenant_id,
+                            first_name.strip(),
+                            last_name.strip(),
+                            email.strip().lower(),
+                            username.strip().lower()
+                        )
+                        
+                        # Send invitation email
+                        success = send_admin_invitation_email(
+                            email.strip().lower(),
+                            first_name.strip(),
+                            verification_token,
+                            name.strip()
+                        )
+                        
+                        if success:
+                            st.toast("✅ Tenant Admin created successfully! Invitation email sent.", icon="✅")
+                            st.session_state.show_admin_form = False
+                            st.session_state.new_tenant_id = None
+                            st.rerun()
+                        else:
+                            st.error("Failed to send invitation email. Please try again.")
+                    except Exception as e:
+                        if "users_username_key" in str(e):
+                            st.error("Username already exists. Please choose a different username.")
+                        elif "users_email_key" in str(e):
+                            st.error("Email address already registered. Please use a different email.")
+                        else:
+                            st.error(f"Error creating admin user: {str(e)}")
     
     # Tenant list display
     st.markdown("### Tenant Directory")
