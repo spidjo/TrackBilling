@@ -1,8 +1,12 @@
-# src/run_app.py
+import sys
+import os
 import subprocess
 import signal
 import sys
 import time
+
+# Add project root to PYTHONPATH
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 processes = []
 
@@ -35,7 +39,7 @@ if __name__ == "__main__":
         "--server.port=8501", "--server.headless=true"
     ])
 
-    # Start FastAPI (verify_email.py)
+    # Start FastAPI (verify_email.py) — run from "src" package
     start_process([
         "/home/ubuntu/sgltrack/venv/bin/uvicorn", "src.verify_email:app",
         "--host", "127.0.0.1", "--port", "8000", "--workers", "1"
