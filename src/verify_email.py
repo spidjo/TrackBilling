@@ -2,7 +2,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from auth_manager import verify_token
+from src.auth_manager import verify_token
 
 app = FastAPI(title="SglTrack Email Verification")
 
