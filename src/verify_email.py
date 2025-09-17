@@ -2,8 +2,11 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from src.auth_manager import verify_token  # ✅ fixed import
+from src.auth_manager import verify_token
+import logging
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 app = FastAPI(title="SglTrack Email Verification")
 
 # Allow cross-origin requests from your frontend domain
@@ -31,6 +34,7 @@ def verify_email(token: str):
         </html>
         """
     else:
+        logger.warning(f"Token verification failed: {result.get('error','Invalid or expired token')}")
         html_content = f"""
         <html>
             <head><title>Verification Failed</title></head>
@@ -42,3 +46,4 @@ def verify_email(token: str):
         </html>
         """
     return HTMLResponse(content=html_content, status_code=200)
+
