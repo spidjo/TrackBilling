@@ -178,3 +178,107 @@ The {APP_NAME} Team
         body_text=text_content,
         body_html=html_content
     )
+
+def send_admin_invitation_email(to_email, username, token, tenant_name, subject=None, message=None):
+    """Send tenant admin invitation email using SendGrid"""
+    verification_link = f"{APP_URL}/verify?token={token}"
+    
+    # Use custom subject/message if provided, otherwise use default
+    if not subject:
+        subject = f"👑 Invitation to join {tenant_name} as Tenant Administrator"
+    
+    if not message:
+        # Render HTML content from template if available
+        try:
+            template = templates_env.get_template("admin_invitation.html")
+            html_content = template.render(
+                username=username,
+                tenant_name=tenant_name,
+                verification_link=verification_link,
+                app_name=APP_NAME,
+                app_url=APP_URL
+            )
+        except:
+            # Fallback to basic HTML if template not found
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                    .header {{ background-color: #4CAF50; color: white; padding: 20px; text-align: center; }}
+                    .content {{ padding: 20px; background-color: #f9f9f9; }}
+                    .button {{ display: inline-block; padding: 12px 24px; background-color: #4CAF50; 
+                              color: white; text-decoration: none; border-radius: 4px; margin: 20px 0; }}
+                    .footer {{ padding: 20px; text-align: center; color: #666; font-size: 12px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Tenant Administrator Invitation</h1>
+                    </div>
+                    <div class="content">
+                        <p>Dear {username},</p>
+                        <p>You have been invited to become the <strong>Tenant Administrator</strong> for <strong>{tenant_name}</strong>.</p>
+                        <p>As a Tenant Administrator, you will have full access to manage users, subscriptions, and configurations for your organization.</p>
+                        <p style="text-align: center;">
+                            <a href="{verification_link}" class="button">Accept Invitation & Set Password</a>
+                        </p>
+                        <p>This invitation link will expire in <strong>24 hours</strong>.</p>
+                        <p>If you did not request this invitation or believe this was sent in error, please ignore this email.</p>
+                    </div>
+                    <div class="footer">
+                        <p>This is an automated message from {APP_NAME}. Please do not reply to this email.</p>
+                        <p>© {datetime.now().year} {APP_NAME}. All rights reserved.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+        
+        text_content = f"""Dear {username},
+
+You have been invited to become the Tenant Administrator for {tenant_name}.
+
+As a Tenant Administrator, you will have full access to manage users, subscriptions, and configurations for your organization.
+
+Please click the link below to set your password and verify your account:
+{verification_link}
+
+This invitation link will expire in 24 hours.
+
+If you did not request this invitation or believe this was sent in error, please ignore this email.
+
+Best regards,
+The {APP_NAME} Team
+"""
+    else:
+        # Use the provided custom message
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
+                <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
+                    <h1>Tenant Administrator Invitation</h1>
+                </div>
+                <div style="padding: 20px; background-color: #f9f9f9;">
+                    {message.replace('\n', '<br>')}
+                </div>
+                <div style="padding: 20px; text-align: center; color: #666; font-size: 12px;">
+                    <p>This is an automated message from {APP_NAME}. Please do not reply to this email.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        text_content = message
+    
+    return send_email_via_sendgrid(
+        to_email=to_email,
+        subject=subject,
+        body_text=text_content,
+        body_html=html_content
+    )

@@ -5,7 +5,7 @@ from utils.session_guard import require_login
 import secrets
 import re
 from datetime import datetime, timedelta
-from utils.email_service import send_verification_email
+from utils.email_service import send_admin_invitation_email
 
 # Custom CSS for styling
 st.markdown("""
@@ -130,39 +130,17 @@ def is_valid_username(username):
     pattern = r'^[a-zA-Z0-9_]{3,50}$'
     return re.match(pattern, username) is not None
 
-def send_admin_invitation_email(email, first_name, verification_token, tenant_name):
+def send_admin_invite_email(email, first_name, verification_token, tenant_name):
     """Send invitation email to tenant admin"""
     try:
-        # Create verification link (adjust URL based on your application)
-        verification_link = f"https://yourapp.com/verify?token={verification_token}"
-        
-        # Email content
-        subject = f"Invitation to join {tenant_name} as Tenant Administrator"
-        message = f"""
-        Dear {first_name},
-        
-        You have been invited to become the Tenant Administrator for {tenant_name}.
-        
-        Please click the link below to set your password and verify your account:
-        {verification_link}
-        
-        This link will expire in 24 hours.
-        
-        If you did not request this invitation, please ignore this email.
-        
-        Best regards,
-        Your Application Team
-        """
-        
-        # Send email
-        send_verification_email(
+        # Send email using the enhanced email service
+        success = send_admin_invitation_email(
             to_email=email,
             username=first_name,
             token=verification_token,
-            subject=subject,
-            message=message
+            tenant_name=tenant_name
         )
-        return True
+        return success
     except Exception as e:
         st.error(f"Failed to send invitation email: {str(e)}")
         return False
@@ -335,12 +313,13 @@ def tenant_manager():
                         )
                         
                         # Send invitation email
-                        success = send_admin_invitation_email(
+                        success = send_admin_invite_email(
                             email.strip().lower(),
                             first_name.strip(),
                             verification_token,
                             name.strip()
                         )
+
                         
                         if success:
                             st.toast("Tenant Admin created successfully! Invitation email sent.", icon="✅")
