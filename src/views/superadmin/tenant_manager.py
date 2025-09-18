@@ -1,3 +1,4 @@
+# tenant_manager.py - Recreated with proper UTF-8 encoding
 import streamlit as st
 from db.database import get_db_connection
 from utils.session_guard import require_login
@@ -96,6 +97,11 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
+        # Get the tenant's company name
+        cursor.execute("SELECT company_name FROM tenants WHERE id = %s", (tenant_id,))
+        tenant_result = cursor.fetchone()
+        company_name = tenant_result[0] if tenant_result else None
+        
         # Generate verification token
         verification_token = secrets.token_urlsafe(32)
         token_timestamp = datetime.now()
@@ -103,11 +109,11 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
         # Create user with temporary password and verification token
         cursor.execute("""
             INSERT INTO users 
-            (tenant_id, first_name, last_name, username, email, role, is_active, 
-             verification_token, token_timestamp, is_verified, registration_date)
-            VALUES (%s, %s, %s, %s, %s, 'admin', 1, %s, %s, 0, CURRENT_TIMESTAMP)
+            (tenant_id, first_name, last_name, username, password, email, role, is_active, 
+             verification_token, token_timestamp, is_verified, registration_date, company_name)
+            VALUES (%s, %s, %s, %s, 'password123', %s, 'admin', 1, %s, %s, 0, CURRENT_TIMESTAMP, %s)
             RETURNING id
-        """, (tenant_id, first_name, last_name, username, email, verification_token, token_timestamp))
+        """, (tenant_id, first_name, last_name, username, email, verification_token, token_timestamp, company_name))
         
         user_id = cursor.fetchone()[0]
         conn.commit()
@@ -164,9 +170,9 @@ def send_admin_invitation_email(email, first_name, verification_token, tenant_na
 def tenant_manager():
     """Main tenant management interface"""
     require_login('superadmin')
-    st.set_page_config(page_title="🏢 Tenant Management", layout="wide")
+    st.set_page_config(page_title="Tenant Management", layout="wide")
     
-    st.title("🏢 Tenant Management")
+    st.title("Tenant Management")
     st.markdown("Manage all tenant accounts and their configurations")
     
     # Load tenant data
@@ -244,7 +250,7 @@ def tenant_manager():
             
             # Form submission
             submitted = st.form_submit_button(
-                "💾 Save Tenant",
+                "Save Tenant",
                 type="primary",
                 use_container_width=True
             )
@@ -256,7 +262,7 @@ def tenant_manager():
                     try:
                         if is_existing:
                             update_tenant(tenant_id, name.strip(), industry)
-                            st.toast("✅ Tenant updated successfully", icon="✅")
+                            st.toast("Tenant updated successfully", icon="success")
                         else:
                             # Create new tenant
                             new_tenant_id = create_tenant(
@@ -268,7 +274,7 @@ def tenant_manager():
                             )
                             st.session_state.new_tenant_id = new_tenant_id
                             st.session_state.show_admin_form = True
-                            st.toast("✅ Tenant created successfully! Please create the first Tenant Admin.", icon="✅")
+                            st.toast("Tenant created successfully! Please create the first Tenant Admin.", icon="success")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error saving tenant: {str(e)}")
@@ -279,7 +285,7 @@ def tenant_manager():
         with st.form("admin_form"):
             st.markdown("""
             <div class='admin-form'>
-                <h4>👥 Tenant Administrator Setup</h4>
+                <h4>Tenant Administrator Setup</h4>
                 <p>Create the first administrator account for this tenant. This user will receive an email to set their password and verify their account.</p>
             </div>
             """, unsafe_allow_html=True)
@@ -297,7 +303,7 @@ def tenant_manager():
                 username = st.text_input("Username", placeholder="Choose a username")
             
             admin_submitted = st.form_submit_button(
-                "👤 Create Admin & Send Invitation",
+                "Create Admin & Send Invitation",
                 type="secondary",
                 use_container_width=True
             )
@@ -337,7 +343,7 @@ def tenant_manager():
                         )
                         
                         if success:
-                            st.toast("✅ Tenant Admin created successfully! Invitation email sent.", icon="✅")
+                            st.toast("Tenant Admin created successfully! Invitation email sent.", icon="success")
                             st.session_state.show_admin_form = False
                             st.session_state.new_tenant_id = None
                             st.rerun()
@@ -366,17 +372,17 @@ def tenant_manager():
                     st.markdown(f"**{name}**")
                     st.markdown(f"<span class='industry-badge'>{industry}</span>", unsafe_allow_html=True)
                 with cols[1]:
-                    st.markdown(f"👤 {user_count}")
+                    st.markdown(f"Users: {user_count}")
                 with cols[2]:
-                    st.markdown(f"📊 {active_subs}")
+                    st.markdown(f"Subs: {active_subs}")
                 with cols[3]:
-                    if st.button("✏️ Edit", key=f"edit_{tenant_id}"):
+                    if st.button("Edit", key=f"edit_{tenant_id}"):
                         st.session_state.edit_tenant = tenant_id
                         st.rerun()
                 with cols[4]:
-                    if st.button("🗑️ Delete", key=f"del_{tenant_id}"):
+                    if st.button("Delete", key=f"del_{tenant_id}"):
                         delete_tenant(tenant_id)
-                        st.toast("✅ Tenant marked as inactive", icon="✅")
+                        st.toast("Tenant marked as inactive", icon="success")
                         st.rerun()
                 
                 st.divider()
