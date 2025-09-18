@@ -262,7 +262,7 @@ def tenant_manager():
                     try:
                         if is_existing:
                             update_tenant(tenant_id, name.strip(), industry)
-                            st.toast("Tenant updated successfully", icon="success")
+                            st.toast("Tenant updated successfully", icon="✅")
                         else:
                             # Create new tenant
                             new_tenant_id = create_tenant(
@@ -274,7 +274,7 @@ def tenant_manager():
                             )
                             st.session_state.new_tenant_id = new_tenant_id
                             st.session_state.show_admin_form = True
-                            st.toast("Tenant created successfully! Please create the first Tenant Admin.", icon="success")
+                            st.toast("Tenant created successfully! Please create the first Tenant Admin.", icon="✅")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error saving tenant: {str(e)}")
@@ -343,7 +343,7 @@ def tenant_manager():
                         )
                         
                         if success:
-                            st.toast("Tenant Admin created successfully! Invitation email sent.", icon="success")
+                            st.toast("Tenant Admin created successfully! Invitation email sent.", icon="✅")
                             st.session_state.show_admin_form = False
                             st.session_state.new_tenant_id = None
                             st.rerun()
@@ -382,7 +382,7 @@ def tenant_manager():
                 with cols[4]:
                     if st.button("Delete", key=f"del_{tenant_id}"):
                         delete_tenant(tenant_id)
-                        st.toast("Tenant marked as inactive", icon="success")
+                        st.toast("Tenant marked as inactive", icon="✅")
                         st.rerun()
                 
                 st.divider()
