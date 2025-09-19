@@ -137,19 +137,19 @@ def authenticate_user(username: str, password: str) -> tuple:
         if conn: conn.close()
 
 def verify_token(token: str) -> dict:
-    """Verify email verification token"""
+    """Verify email verification token and return user information including role"""
     logger.info(f"Attempting to verify token: {token}")
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Find user with this token
+        # Find user with this token and get their role
         cursor.execute("""
-            SELECT id FROM users 
+            SELECT id, role FROM users 
             WHERE verification_token = %s
                 AND is_verified = 0
-                --AND token_timestamp > NOW() - INTERVAL '1 hour'
+                AND token_timestamp > NOW() - INTERVAL '24 hour'
         """, (token,))
         
         user = cursor.fetchone()
@@ -157,8 +157,8 @@ def verify_token(token: str) -> dict:
             logger.warning(f"Invalid or expired token: {token}")
             return {"success": False, "error": "Invalid or expired token"}
             
-        user_id = user[0]
-        logger.info(f"Token valid for user ID: {user_id}")
+        user_id, user_role = user
+        logger.info(f"Token valid for user ID: {user_id}, role: {user_role}")
         
         # Mark user as verified
         cursor.execute("""
@@ -170,7 +170,11 @@ def verify_token(token: str) -> dict:
         
         conn.commit()
         logger.info(f"User {user_id} verified successfully")
-        return {"success": True}
+        return {
+            "success": True,
+            "user_role": user_role,
+            "user_id": user_id
+        }
         
     except Exception as e:
         if conn: conn.rollback()
@@ -253,6 +257,40 @@ def resend_verification_email(username: str) -> dict:
     finally:
         if conn: conn.close()
 
+# Add this function to src/auth_manager.py
+
+def create_password_reset_token(user_id: int) -> str:
+    """Create a password reset token for a user and return the token"""
+    logger.info(f"Creating password reset token for user ID: {user_id}")
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Remove any existing tokens for this user
+        cursor.execute("DELETE FROM password_resets WHERE user_id = %s", (user_id,))
+        
+        # Generate new token
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        
+        # Insert new password reset token
+        cursor.execute("""
+            INSERT INTO password_resets (user_id, token, expires_at)
+            VALUES (%s, %s, %s)
+        """, (user_id, token, expires_at))
+        
+        conn.commit()
+        logger.info(f"Password reset token created for user ID: {user_id}")
+        return token
+        
+    except Exception as e:
+        logger.error(f"Error creating password reset token for user {user_id}: {str(e)}")
+        if conn: conn.rollback()
+        return None
+    finally:
+        if conn: conn.close()
+        
 def get_client_ip() -> str:
     """Get client IP address"""
     try:

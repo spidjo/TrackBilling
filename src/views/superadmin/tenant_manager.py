@@ -4,8 +4,9 @@ from db.database import get_db_connection
 from utils.session_guard import require_login
 import secrets
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from utils.email_service import send_admin_invitation_email
+
 
 # Custom CSS for styling
 st.markdown("""
@@ -93,7 +94,7 @@ def delete_tenant(tenant_id):
         conn.commit()
 
 def create_tenant_admin(tenant_id, first_name, last_name, email, username):
-    """Create a tenant admin user with verification token"""
+    """Create a tenant admin user with verification token AND password reset token"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
@@ -104,21 +105,31 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
         
         # Generate verification token
         verification_token = secrets.token_urlsafe(32)
-        token_timestamp = datetime.now()
+        
+        # Generate password reset token (1 hour expiry)
+        password_reset_token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
         
         # Create user with temporary password and verification token
         cursor.execute("""
             INSERT INTO users 
             (tenant_id, first_name, last_name, username, password, email, role, is_active, 
              verification_token, token_timestamp, is_verified, registration_date, company_name)
-            VALUES (%s, %s, %s, %s, 'password123', %s, 'admin', 1, %s, %s, 0, CURRENT_TIMESTAMP, %s)
+            VALUES (%s, %s, %s, %s, 'password123', %s, 'admin', 1, %s, NOW(), 0, CURRENT_TIMESTAMP, %s)
             RETURNING id
-        """, (tenant_id, first_name, last_name, username, email, verification_token, token_timestamp, company_name))
+        """, (tenant_id, first_name, last_name, username, email, verification_token, company_name))
         
         user_id = cursor.fetchone()[0]
+        
+        # Insert password reset token
+        cursor.execute("""
+            INSERT INTO password_resets (user_id, token, expires_at)
+            VALUES (%s, %s, %s)
+        """, (user_id, password_reset_token, expires_at))
+        
         conn.commit()
         
-        return user_id, verification_token
+        return user_id, verification_token, password_reset_token
 
 def is_valid_email(email):
     """Validate email format"""
@@ -304,19 +315,19 @@ def tenant_manager():
                 else:
                     try:
                         # Create admin user
-                        user_id, verification_token = create_tenant_admin(
+                        user_id, verification_token, password_reset_token = create_tenant_admin(
                             st.session_state.new_tenant_id,
                             first_name.strip(),
                             last_name.strip(),
                             email.strip().lower(),
                             username.strip().lower()
                         )
-                        
-                        # Send invitation email
+
+                        # Send invitation email - use the password_reset_token for the reset link
                         success = send_admin_invite_email(
                             email.strip().lower(),
                             first_name.strip(),
-                            verification_token,
+                            password_reset_token,  # Use the password reset token, not verification token
                             name.strip()
                         )
 
