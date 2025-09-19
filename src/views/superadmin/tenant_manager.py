@@ -88,7 +88,7 @@ def delete_tenant(tenant_id):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE tenants SET is_active = FALSE WHERE id = %s",
+            "UPDATE tenants SET is_active = 0 WHERE id = %s",
             (tenant_id,)
         )
         conn.commit()
@@ -116,7 +116,7 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
             INSERT INTO users 
             (tenant_id, first_name, last_name, username, password, email, role, is_active, 
              verification_token, token_timestamp, is_verified, registration_date, company_name, last_verification_sent)
-            VALUES (%s, %s, %s, %s, %s, %s, 'admin', 1, %s, %s, FALSE, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, 'admin', 1, %s, %s, 1, %s, %s, %s)
             RETURNING id
         """, (
             tenant_id,
