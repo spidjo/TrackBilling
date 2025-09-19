@@ -116,7 +116,7 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
             INSERT INTO users 
             (tenant_id, first_name, last_name, username, password, email, role, is_active, 
              verification_token, token_timestamp, is_verified, registration_date, company_name, last_verification_sent)
-            VALUES (%s, %s, %s, %s, %s, %s, 'admin', TRUE, %s, %s, FALSE, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, 'admin', 1, %s, %s, FALSE, %s, %s, %s)
             RETURNING id
         """, (
             tenant_id,
