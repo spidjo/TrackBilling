@@ -125,7 +125,7 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
             username,
             'password123',  # temporary password
             email,
-            verification_token,
+            Null,
             now_utc,
             now_utc,
             company_name,
