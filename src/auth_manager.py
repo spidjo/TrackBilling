@@ -9,8 +9,8 @@ from datetime import datetime, timedelta, timezone
 from dateutil import parser
 from email_validator import validate_email, EmailNotValidError
 from functools import lru_cache
-from src.db.database import get_db_connection
-from src.utils.email_service import send_verification_email
+from db.database import get_db_connection
+from utils.email_service import send_verification_email
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
