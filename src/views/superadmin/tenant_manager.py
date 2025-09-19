@@ -94,7 +94,11 @@ def delete_tenant(tenant_id):
         conn.commit()
 
 def create_tenant_admin(tenant_id, first_name, last_name, email, username):
-    """Create a tenant admin user with verification token AND password reset token"""
+    """
+    Create a tenant admin user with verification token.
+    Admin will receive an invitation email to verify their account
+    and then set their password via a password reset flow.
+    """
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
@@ -105,31 +109,34 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
         
         # Generate verification token
         verification_token = secrets.token_urlsafe(32)
-        
-        # Generate password reset token (1 hour expiry)
-        password_reset_token = secrets.token_urlsafe(32)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        now_utc = datetime.now(timezone.utc)
         
         # Create user with temporary password and verification token
         cursor.execute("""
             INSERT INTO users 
             (tenant_id, first_name, last_name, username, password, email, role, is_active, 
-             verification_token, token_timestamp, is_verified, registration_date, company_name)
-            VALUES (%s, %s, %s, %s, 'password123', %s, 'admin', 1, %s, NOW(), 0, CURRENT_TIMESTAMP, %s)
+             verification_token, token_timestamp, is_verified, registration_date, company_name, last_verification_sent)
+            VALUES (%s, %s, %s, %s, %s, %s, 'admin', TRUE, %s, %s, FALSE, %s, %s, %s)
             RETURNING id
-        """, (tenant_id, first_name, last_name, username, email, verification_token, company_name))
+        """, (
+            tenant_id,
+            first_name,
+            last_name,
+            username,
+            'password123',  # temporary password
+            email,
+            verification_token,
+            now_utc,
+            now_utc,
+            company_name,
+            now_utc
+        ))
         
         user_id = cursor.fetchone()[0]
-        
-        # Insert password reset token
-        cursor.execute("""
-            INSERT INTO password_resets (user_id, token, expires_at)
-            VALUES (%s, %s, %s)
-        """, (user_id, password_reset_token, expires_at))
-        
         conn.commit()
         
-        return user_id, verification_token, password_reset_token
+        return user_id, verification_token
+
 
 def is_valid_email(email):
     """Validate email format"""
