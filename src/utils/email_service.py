@@ -182,7 +182,7 @@ The {APP_NAME} Team
 
 def send_admin_invitation_email(to_email, username, token, tenant_name, subject=None, message=None):
     """Send tenant admin invitation email using SendGrid"""
-    verification_link = f"{APP_URL}/reset_password?token={token}"
+    verification_link = f"{APP_URL}/verify_email?token={token}"
     
     # Use custom subject/message if provided, otherwise use default
     if not subject:

@@ -327,7 +327,7 @@ def tenant_manager():
                         success = send_admin_invite_email(
                             email.strip().lower(),
                             first_name.strip(),
-                            password_reset_token,  # Use the password reset token, not verification token
+                            verification_token,  # Use the verification token
                             name.strip()
                         )
 
