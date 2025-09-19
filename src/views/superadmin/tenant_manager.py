@@ -279,7 +279,7 @@ def tenant_manager():
             </div>
             """, unsafe_allow_html=True)
             
-            col1, col2 = st.columns(2)
+            col1, col2 = st.columns(2) 
             with col1:
                 first_name = st.text_input("First Name", placeholder="Admin's first name")
             with col2:
