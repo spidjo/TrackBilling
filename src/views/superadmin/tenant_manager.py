@@ -322,7 +322,7 @@ def tenant_manager():
                 else:
                     try:
                         # Create admin user
-                        user_id, verification_token, password_reset_token = create_tenant_admin(
+                        user_id, verification_token = create_tenant_admin(
                             st.session_state.new_tenant_id,
                             first_name.strip(),
                             last_name.strip(),
@@ -330,7 +330,7 @@ def tenant_manager():
                             username.strip().lower()
                         )
 
-                        # Send invitation email - use the password_reset_token for the reset link
+                        # Send invitation email with verification token
                         success = send_admin_invite_email(
                             email.strip().lower(),
                             first_name.strip(),
