@@ -3,7 +3,7 @@
 
 import psycopg2
 import psycopg2.extras
-from src.config import settings
+from config import settings
 
 def get_db_connection():
     return psycopg2.connect(
