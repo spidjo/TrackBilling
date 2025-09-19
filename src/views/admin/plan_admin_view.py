@@ -107,8 +107,8 @@ BILLING_CYCLES = ["Monthly", "Quarterly", "Annual"]
 @st.cache_data(ttl=600)
 def fetch_plans_for_tenant(tenant_id: int):
     """Cached fetch for plans belonging to a tenant."""
-    conn = get_db_connection()
     try:
+        conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
             SELECT 
@@ -120,12 +120,21 @@ def fetch_plans_for_tenant(tenant_id: int):
         """, (tenant_id,))
         plans = cur.fetchall()
         return plans
+    except Exception as e:
+        st.error(f"Error fetching plans: {e}")
+        return []
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 def format_currency(value):
     """Format currency values consistently"""
-    return f"R{float(value):,.2f}" if value else "R0.00"
+    if value is None:
+        return "R0.00"
+    try:
+        return f"R{float(value):,.2f}"
+    except (ValueError, TypeError):
+        return "R0.00"
 
 def plan_admin_view():
     """Professional admin interface for managing subscription plans"""
@@ -174,11 +183,15 @@ def plan_admin_view():
                 WHERE tenant_id = %s
             """, (tenant_id,))
             stats = cursor.fetchone()
-            total_plans = stats["total_plans"] if stats else 0
-            active_plans = stats["active_plans"] if stats else 0
-            inactive_plans = stats["inactive_plans"] if stats else 0
+            total_plans = stats["total_plans"] if stats and stats["total_plans"] is not None else 0
+            active_plans = stats["active_plans"] if stats and stats["active_plans"] is not None else 0
+            inactive_plans = stats["inactive_plans"] if stats and stats["inactive_plans"] is not None else 0
+        except Exception as e:
+            st.error(f"Error fetching statistics: {e}")
+            total_plans, active_plans, inactive_plans = 0, 0, 0
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     # Display plan statistics
     col1, col2, col3, col4 = st.columns(4)
@@ -218,9 +231,13 @@ def plan_admin_view():
                 AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)
             """, (tenant_id,))
             subscribers = cursor.fetchone()
-            total_subscribers = subscribers["total_subscribers"] if subscribers else 0
+            total_subscribers = subscribers["total_subscribers"] if subscribers and subscribers["total_subscribers"] is not None else 0
+        except Exception as e:
+            st.error(f"Error fetching subscriber count: {e}")
+            total_subscribers = 0
         finally:
-            conn.close()
+            if conn:
+                conn.close()
         
         st.markdown(f"""
         <div class="metric-card metric-warning">
@@ -344,6 +361,15 @@ def plan_admin_view():
     try:
         for i, plan in enumerate(plans):
             plan_id, name, desc, fee, units, overage, cycle, active = plan
+            
+            # Handle potential None values
+            name = name or "Unnamed Plan"
+            desc = desc or "No description available"
+            fee = fee or 0.0
+            units = units or 0
+            overage = overage or 0.0
+            cycle = cycle or "Monthly"
+            
             if cycle not in BILLING_CYCLES:
                 cycle = "Monthly"
 
@@ -432,43 +458,47 @@ def plan_admin_view():
                 with action_col3:
                     with st.expander("👥 Subscriber Analytics", expanded=False):
                         with loading_spinner("Loading subscriber data..."):
-                            cursor.execute("""
-                                SELECT 
-                                    u.username, 
-                                    s.start_date, 
-                                    s.end_date, 
-                                    s.is_active,
-                                    COUNT(*) OVER() as total_count
-                                FROM subscriptions s
-                                JOIN users u ON u.id = s.user_id
-                                WHERE s.plan_id = %s
-                                ORDER BY s.is_active DESC, s.start_date DESC
-                                LIMIT 50
-                            """, (plan_id,))
-                            subscribers = cursor.fetchall()
+                            try:
+                                cursor.execute("""
+                                    SELECT 
+                                        u.username, 
+                                        s.start_date, 
+                                        s.end_date, 
+                                        s.is_active,
+                                        COUNT(*) OVER() as total_count
+                                    FROM subscriptions s
+                                    JOIN users u ON u.id = s.user_id
+                                    WHERE s.plan_id = %s
+                                    ORDER BY s.is_active DESC, s.start_date DESC
+                                    LIMIT 50
+                                """, (plan_id,))
+                                subscribers = cursor.fetchall()
 
-                        if subscribers:
-                            total_subs = subscribers[0][4] if subscribers else 0
-                            active_subs = sum(1 for sub in subscribers if sub[3])
-                            
-                            sub_col1, sub_col2 = st.columns(2)
-                            with sub_col1:
-                                st.metric("Total Subscribers", total_subs)
-                            with sub_col2:
-                                st.metric("Active Subscribers", active_subs)
-                            
-                            st.write("**Recent Subscribers:**")
-                            for sub in subscribers[:5]:  # Show top 5
-                                uname, start, end, sub_active, _ = sub
-                                status_text = "🟢 Active" if sub_active else "🔴 Ended"
-                                start_fmt = start.strftime('%Y-%m-%d') if start else "N/A"
-                                end_fmt = end.strftime('%Y-%m-%d') if end else "Ongoing"
-                                st.write(f"- **{uname}** | {start_fmt} → {end_fmt} | {status_text}")
-                            
-                            if total_subs > 5:
-                                st.caption(f"Showing 5 of {total_subs} subscribers")
-                        else:
-                            st.info("No subscribers for this plan")
+                                if subscribers:
+                                    total_subs = subscribers[0][4] if subscribers and subscribers[0][4] is not None else 0
+                                    active_subs = sum(1 for sub in subscribers if sub[3])
+                                    
+                                    sub_col1, sub_col2 = st.columns(2)
+                                    with sub_col1:
+                                        st.metric("Total Subscribers", total_subs)
+                                    with sub_col2:
+                                        st.metric("Active Subscribers", active_subs)
+                                    
+                                    st.write("**Recent Subscribers:**")
+                                    for sub in subscribers[:5]:  # Show top 5
+                                        uname, start, end, sub_active, _ = sub
+                                        uname = uname or "Unknown User"
+                                        status_text = "🟢 Active" if sub_active else "🔴 Ended"
+                                        start_fmt = start.strftime('%Y-%m-%d') if start else "N/A"
+                                        end_fmt = end.strftime('%Y-%m-%d') if end else "Ongoing"
+                                        st.write(f"- **{uname}** | {start_fmt} → {end_fmt} | {status_text}")
+                                    
+                                    if total_subs > 5:
+                                        st.caption(f"Showing 5 of {total_subs} subscribers")
+                                else:
+                                    st.info("No subscribers for this plan")
+                            except Exception as e:
+                                st.error(f"Error loading subscriber data: {e}")
                 
                 # Edit form (shown when in edit mode)
                 if st.session_state.get("edit_mode") == plan_id:
@@ -559,8 +589,11 @@ def plan_admin_view():
                 # Add separator between plans (except after the last one)
                 if i < len(plans) - 1:
                     st.markdown('<div class="plan-separator"></div>', unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Error loading plans: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 if __name__ == "__main__":
     plan_admin_view()
