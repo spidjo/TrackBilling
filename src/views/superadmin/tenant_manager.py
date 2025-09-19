@@ -108,7 +108,8 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
         company_name = tenant_result[0] if tenant_result else None
         
         # Generate verification token
-        verification_token = secrets.token_urlsafe(32)
+        # set verification_token to None initially
+        verification_token = None
         now_utc = datetime.now(timezone.utc)
         
         # Create user with temporary password and verification token
@@ -125,7 +126,7 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
             username,
             'password123',  # temporary password
             email,
-            Null,
+            verification_token,
             now_utc,
             now_utc,
             company_name,
