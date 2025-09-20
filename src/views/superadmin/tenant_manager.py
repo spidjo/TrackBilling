@@ -5,7 +5,7 @@ from utils.session_guard import require_login
 import secrets
 import re
 from datetime import datetime, timedelta, timezone
-from utils.email_service import send_admin_invitation_email
+from utils.email_service import APP_NAME, APP_URL,  send_admin_invitation_email
 
 
 # Custom CSS for styling
@@ -92,12 +92,11 @@ def delete_tenant(tenant_id):
             (tenant_id,)
         )
         conn.commit()
+        
 
 def create_tenant_admin(tenant_id, first_name, last_name, email, username):
     """
-    Create a tenant admin user with verification token.
-    Admin will receive an invitation email to verify their account
-    and then set their password via a password reset flow.
+    Create a tenant admin user with password reset token instead of verification token.
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -107,16 +106,17 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
         tenant_result = cursor.fetchone()
         company_name = tenant_result[0] if tenant_result else None
         
-        # Generate verification token
-        verification_token = secrets.token_urlsafe(32)
+        # Generate password reset token (not verification token)
+        reset_token = secrets.token_urlsafe(32)
         now_utc = datetime.now(timezone.utc)
+        reset_expiry = now_utc + timedelta(hours=24)
         
-        # Create user with temporary password and verification token
+        # Create user as verified immediately with password reset token
         cursor.execute("""
             INSERT INTO users 
             (tenant_id, first_name, last_name, username, password, email, role, is_active, 
-             verification_token, token_timestamp, is_verified, registration_date, company_name, last_verification_sent)
-            VALUES (%s, %s, %s, %s, %s, %s, 'admin', 1, %s, %s, 1, %s, %s, %s)
+             is_verified, registration_date, company_name)
+            VALUES (%s, %s, %s, %s, %s, %s, 'admin', 1, 1, %s, %s)
             RETURNING id
         """, (
             tenant_id,
@@ -125,17 +125,21 @@ def create_tenant_admin(tenant_id, first_name, last_name, email, username):
             username,
             'password123',  # temporary password
             email,
-            verification_token,
             now_utc,
-            now_utc,
-            company_name,
-            now_utc
+            company_name
         ))
         
         user_id = cursor.fetchone()[0]
+        
+        # Now create password reset entry
+        cursor.execute("""
+            INSERT INTO password_resets (user_id, token, expires_at)
+            VALUES (%s, %s, %s)
+        """, (user_id, reset_token, reset_expiry))
+        
         conn.commit()
         
-        return user_id, verification_token
+        return user_id, reset_token
 
 
 def is_valid_email(email):
@@ -148,15 +152,28 @@ def is_valid_username(username):
     pattern = r'^[a-zA-Z0-9_]{3,50}$'
     return re.match(pattern, username) is not None
 
-def send_admin_invite_email(email, first_name, verification_token, tenant_name):
-    """Send invitation email to tenant admin"""
+def send_admin_invite_email(email, first_name, reset_token, tenant_name):
+    """Send invitation email to tenant admin with PASSWORD RESET link"""
     try:
         # Send email using the enhanced email service
         success = send_admin_invitation_email(
             to_email=email,
             username=first_name,
-            token=verification_token,
-            tenant_name=tenant_name
+            token=reset_token,  # This is now a password reset token
+            tenant_name=tenant_name,
+            subject=f"Set Your Password for {tenant_name}",
+            message=f"""Dear {first_name},
+
+            You have been invited to become the Tenant Administrator for {tenant_name}.
+
+            Please click the link below to set your password:
+            {APP_URL}/reset-password?token={reset_token}
+
+            This password reset link will expire in 24 hours.
+
+            Best regards,
+            The {APP_NAME} Team
+            """
         )
         return success
     except Exception as e:
