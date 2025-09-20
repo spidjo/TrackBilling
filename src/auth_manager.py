@@ -137,24 +137,24 @@ def authenticate_user(username: str, password: str) -> tuple:
         if conn: conn.close()
 
 def verify_token(token: str) -> dict:
-    """Verify email verification token and return user information including role"""
+    """Verify email verification token - SIMPLIFIED VERSION"""
     logger.info(f"Attempting to verify token: {token}")
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Find user with this token and get their role if valid
+        # Simplified query without timestamp check for debugging
         cursor.execute("""
             SELECT id, role FROM users 
             WHERE verification_token = %s
                 AND is_verified = 0
-                AND token_timestamp > NOW() - INTERVAL '24 hour'
         """, (token,))
         
         user = cursor.fetchone()
+        
         if not user:
-            logger.warning(f"Invalid or expired token: {token}")
+            logger.warning(f"Invalid token or already verified: {token}")
             return {"success": False, "error": "Invalid or expired token"}
             
         user_id, user_role = user
