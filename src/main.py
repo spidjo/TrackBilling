@@ -146,10 +146,96 @@ def get_menu(role: Role) -> Dict[str, Callable]:
 # --- Authentication Handlers ---
 def handle_token_verification(token: str):
     result = verify_token(token)
+    
+    # Set page title and icon
+    st.set_page_config(page_title="Email Verification - SglTrack", page_icon="✅")
+    
+    # Apply theme
+    theme = DARK_THEME if st.session_state.get("dark_mode", False) else LIGHT_THEME
+    apply_theme(theme)
+    
+    # Logo
+    logo_base64 = get_logo_base64()
+    if logo_base64:
+        st.markdown(
+            f'<div style="text-align: center; margin-bottom: 1rem;">'
+            f'<img src="data:image/png;base64,{logo_base64}" style="max-width: 120px;">'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+    
     if result.get("success"):
-        st.success("✅ Email verified successfully!")
+        # Success layout
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown(f"""
+            <div style="text-align: center; padding: 2.5rem; background-color: {theme['CARD']}; 
+                        border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin: 2rem 0;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
+                <h2 style="color: {theme['SUCCESS']}; margin-bottom: 1rem;">Email Verified!</h2>
+                <p style="font-size: 1.1rem; color: {theme['TEXT_LIGHT']}; margin-bottom: 2rem;">
+                    Your email address has been successfully verified and your account is now active.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Action buttons
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("🚀 Go to Login", type="primary", use_container_width=True):
+                    st.query_params.clear()
+                    st.rerun()
+            with col_btn2:
+                if st.button("📧 Contact Support", use_container_width=True):
+                    st.query_params.clear()
+                    st.query_params["support"] = "1"
+                    st.rerun()
+        
+        # Additional resources
+        with st.expander("📋 Next Steps & Resources", expanded=True):
+            st.markdown(f"""
+            - **Login to your account** using your username and password
+            - **Explore features** available for your role
+            - **Download our mobile app** (if available)
+            - **Read our documentation** for guidance
+            - **Join our community** for tips and support
+            
+            💡 **Tip:** Bookmark the login page for quick access: 
+            `https://app.sgltrack.com`
+            
+            📞 **Need help?** Email us at support@sgltrack.com
+            """)
+            
     else:
-        st.error(f"❌ {result.get('error', 'Verification failed.')}")
+        # Error layout
+        error_msg = result.get('error', 'Verification failed.')
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown(f"""
+            <div style="text-align: center; padding: 2.5rem; background-color: {theme['CARD']}; 
+                        border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin: 2rem 0;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">❌</div>
+                <h2 style="color: {theme['ERROR']}; margin-bottom: 1rem;">Verification Failed</h2>
+                <p style="font-size: 1.1rem; color: {theme['TEXT_LIGHT']}; margin-bottom: 1rem;">
+                    {error_msg}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Troubleshooting options
+            st.error("""
+            **Common solutions:**
+            - Use the latest verification link from your email
+            - Ensure the link hasn't expired (valid for 24 hours)
+            - Request a new verification email from the login page
+            - Check your spam folder for the verification email
+            """)
+            
+            # Action buttons
+            if st.button("↩️ Back to Login", type="primary", use_container_width=True):
+                st.query_params.clear()
+                st.rerun()
 
 # --- Theme Management ---
 def apply_theme(theme):
