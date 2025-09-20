@@ -144,7 +144,7 @@ def verify_token(token: str) -> dict:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Find user with this token and get their role
+        # Find user with this token and get their role if valid
         cursor.execute("""
             SELECT id, role FROM users 
             WHERE verification_token = %s
