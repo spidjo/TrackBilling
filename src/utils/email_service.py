@@ -71,7 +71,7 @@ def send_email_via_sendgrid(to_email, subject, body_text, body_html=None, attach
 
 def send_verification_email(to_email, username, token): 
     """Send account verification email using SendGrid"""
-    verify_url = f"{APP_URL}/verify_email?token={token}"
+    verify_url = f"{APP_URL}/verify_email?verify={token}"
     
     # Render HTML content from template
     template = templates_env.get_template("email_verification.html")
