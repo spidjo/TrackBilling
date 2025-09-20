@@ -21,7 +21,7 @@
             overflow: hidden;
         }
         .header {
-            background-color: #2c3e50;
+            background: linear-gradient(135deg, #7b1e3a 0%, #5c162c 100%);
             color: white;
             padding: 25px;
             text-align: center;
@@ -35,17 +35,19 @@
         }
         .verify-button {
             display: inline-block;
-            background-color: #4CAF50;
+            background: linear-gradient(135deg, #7b1e3a 0%, #5c162c 100%);
             color: white !important;
             text-decoration: none;
             padding: 14px 28px;
-            border-radius: 4px;
+            border-radius: 6px;
             font-weight: 600;
             font-size: 16px;
-            transition: background-color 0.3s ease;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 12px rgba(123, 30, 58, 0.3);
         }
         .verify-button:hover {
-            background-color: #3e8e41;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(123, 30, 58, 0.4);
         }
         .footer {
             text-align: center;
@@ -53,62 +55,98 @@
             color: #777777;
             font-size: 14px;
             border-top: 1px solid #eeeeee;
+            background-color: #fafafa;
         }
         .verification-code {
-            background-color: #f5f5f5;
-            border-radius: 4px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
             padding: 15px;
             margin: 20px 0;
             text-align: center;
             font-family: monospace;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
-            color: #2c3e50;
+            color: #7b1e3a;
+            border: 1px dashed #e5e7eb;
         }
         .expiry-notice {
             color: #777777;
             font-size: 14px;
             text-align: center;
             margin-top: 10px;
+            font-style: italic;
+        }
+        .next-steps {
+            background-color: #f0f9ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #7b1e3a;
+        }
+        .security-note {
+            background-color: #fff8f8;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 4px solid #e53e3e;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1 style="margin: 0; font-size: 22px;">Welcome to {{ app_name }}</h1>
+            <h1 style="margin: 0; font-size: 22px; letter-spacing: 0.5px;">Welcome to {{ app_name }}</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Complete Your Registration</p>
         </div>
         
         <div class="content">
             <p>Dear {{ username }},</p>
             
-            <p>Thank you for creating an account with {{ app_name }}. To complete your registration and ensure the security of your account, please verify your email address by clicking the button below:</p>
+            <p>Thank you for choosing {{ app_name }}! We're excited to have you on board. To activate your account and ensure its security, please verify your email address by clicking the button below:</p>
             
             <div class="button-container">
-                <a href="{{ verify_url }}" class="verify-button">Verify Email Address</a>
+                <a href="{{ verify_url }}" class="verify-button">Verify My Email Address</a>
             </div>
             
-            <p style="text-align: center;">Or copy and paste this link into your browser:<br>
-            <span style="word-break: break-all; font-size: 13px; color: #3498db;">{{ verify_url }}</span></p>
+            <div class="verification-code">
+                Verification Link: {{ verify_url }}
+            </div>
             
             <div class="expiry-notice">
-                This verification link will expire in 24 hours.
+                ⏰ This verification link will expire in 24 hours for security reasons.
             </div>
             
-            <p>If you didn't create an account with {{ app_name }}, please ignore this email or contact our support team immediately at <a href="mailto:support@{{ app_name|lower }}.com">support@{{ app_name|lower }}.com</a>.</p>
+            <div class="next-steps">
+                <h3 style="margin-top: 0; color: #7b1e3a;">What happens next?</h3>
+                <p>After successful verification:</p>
+                <ul>
+                    <li>You'll be redirected to a confirmation page</li>
+                    <li>Click "Go to Login" to access your account</li>
+                    <li>Sign in with your username and password</li>
+                    <li>Start exploring {{ app_name }} features immediately!</li>
+                </ul>
+            </div>
             
-            <p>For security reasons, we recommend you verify your email address as soon as possible to ensure uninterrupted access to your account.</p>
+            <div class="security-note">
+                <strong>🔒 Security Alert:</strong> If you didn't create an account with {{ app_name }}, 
+                please ignore this email or contact our security team immediately at 
+                <a href="mailto:security@{{ app_name|lower }}.com" style="color: #e53e3e;">security@{{ app_name|lower }}.com</a>.
+            </div>
+            
+            <p>For your security, we recommend verifying your email address as soon as possible to ensure uninterrupted access to all platform features.</p>
         </div>
         
         <div class="footer">
-            <p style="margin: 0;">Best regards,<br>The {{ app_name }} Security Team</p>
+            <p style="margin: 0; font-weight: 500;">Best regards,<br>The {{ app_name }} Team</p>
             <p style="margin: 15px 0 0 0; font-size: 13px;">
-                <a href="{{ app_url }}" style="color: #3498db; text-decoration: none;">Visit our website</a> | 
-                <a href="{{ app_url }}/support" style="color: #3498db; text-decoration: none;">Contact support</a> | 
-                <a href="{{ app_url }}/security" style="color: #3498db; text-decoration: none;">Security tips</a>
+                <a href="{{ app_url }}" style="color: #7b1e3a; text-decoration: none; font-weight: 500;">Visit our website</a> • 
+                <a href="{{ app_url }}/support" style="color: #7b1e3a; text-decoration: none; font-weight: 500;">Get help</a> • 
+                <a href="{{ app_url }}/security" style="color: #7b1e3a; text-decoration: none; font-weight: 500;">Security tips</a>
             </p>
-            <p style="margin-top: 10px; font-size: 11px; color: #bbbbbb;">
-                This is an automated security message. Please do not reply directly to this email.
+            <p style="margin-top: 15px; font-size: 11px; color: #bbbbbb; line-height: 1.4;">
+                This is an automated security message. Please do not reply directly to this email.<br>
+                © {% now 'Y' %} {{ app_name }}. All rights reserved.
             </p>
         </div>
     </div>
