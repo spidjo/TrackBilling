@@ -112,6 +112,9 @@ def fetch_tenants():
     return tenants
 
 def auth_view():
+    # Check for verification token first
+    if handle_email_verification():
+        return  # Stop rendering login/register forms if verifying email
     logger.info(f"Session state at start: {dict(st.session_state)}")
     
     init_session_state()
@@ -298,3 +301,23 @@ def show_password_strength(password, theme):
             </div>
         </div>
     """, unsafe_allow_html=True)
+    
+def handle_email_verification():
+    """Handle email verification within Streamlit"""
+    query_params = st.experimental_get_query_params()
+    token = query_params.get("token", [None])[0]
+    
+    if token:
+        st.title("Email Verification")
+        with st.spinner("Verifying your email..."):
+            result = verify_token(token)
+        
+        if result["success"]:
+            st.success("✅ Email verified successfully!")
+            st.write("You can now log in to your account.")
+            # Clear the token from URL
+            st.experimental_set_query_params()
+        else:
+            st.error(f"❌ Verification failed: {result.get('error', 'Invalid token')}")
+        return True
+    return False
