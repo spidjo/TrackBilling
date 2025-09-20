@@ -304,7 +304,7 @@ def show_password_strength(password, theme):
     
 def handle_email_verification():
     """Handle email verification within Streamlit"""
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params()
     token = query_params.get("token", [None])[0]
     
     if token:
