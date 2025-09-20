@@ -183,7 +183,9 @@ def handle_token_verification(token: str):
             col_btn1, col_btn2 = st.columns(2)
             with col_btn1:
                 if st.button("🚀 Go to Login", type="primary", use_container_width=True):
+                    # COMPLETELY CLEAR ALL QUERY PARAMETERS
                     st.query_params.clear()
+                    # Force a full page reload to ensure clean state
                     st.rerun()
             with col_btn2:
                 if st.button("📧 Contact Support", use_container_width=True):
@@ -234,6 +236,7 @@ def handle_token_verification(token: str):
             
             # Action buttons
             if st.button("↩️ Back to Login", type="primary", use_container_width=True):
+                # COMPLETELY CLEAR ALL QUERY PARAMETERS
                 st.query_params.clear()
                 st.rerun()
 
