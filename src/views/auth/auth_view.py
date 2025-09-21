@@ -14,10 +14,20 @@ from utils.session import init_session_state
 from db.database import get_db_connection
 from utils.login_attempts import is_rate_limited
 import base64
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Initialize reCAPTCHA
+try:
+    from recaptcha import Recaptcha
+    recaptcha = Recaptcha()
+except ImportError:
+    # Fallback if component can't be imported
+    recaptcha = None
+    logger.warning("reCAPTCHA component not available")
 
 def get_logo_base64():
     # Replace with your actual logo path or base64 encoded string
@@ -99,6 +109,18 @@ def apply_auth_theme(theme):
         .auth-transition {{
             animation: fadeIn 0.5s ease-out;
         }}
+        
+        .recaptcha-container {{
+            margin: 1rem 0;
+            display: flex;
+            justify-content: center;
+            min-height: 78px;
+        }}
+        
+        .g-recaptcha {{
+            transform: scale(0.85);
+            transform-origin: 0 0;
+        }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -153,6 +175,15 @@ def auth_view():
             with st.form("login_form", clear_on_submit=False):
                 username = st.text_input("Username", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
+                
+                # Add reCAPTCHA to login form if available
+                recaptcha_response_login = None
+                if recaptcha:
+                    st.markdown('<div class="recaptcha-container">', unsafe_allow_html=True)
+                    recaptcha_response_login = recaptcha.render(key="login_recaptcha")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown("**Please complete the reCAPTCHA verification**", help="This helps us prevent automated attacks")
+                
                 login_submitted = st.form_submit_button("Login", type="primary")
 
                 st.markdown(
@@ -166,7 +197,17 @@ def auth_view():
                     )
             # --- Handle login result ---
             if login_submitted:
-                handle_login(username, password)
+                # Verify reCAPTCHA if available
+                if recaptcha:
+                    if not recaptcha_response_login:
+                        st.error("Please complete the reCAPTCHA verification.")
+                    elif not recaptcha.verify(recaptcha_response_login):
+                        st.error("reCAPTCHA verification failed. Please try again.")
+                    else:
+                        handle_login(username, password)
+                else:
+                    # Fallback without reCAPTCHA
+                    handle_login(username, password)
 
             # --- Render resend button for unverified users ---
             if "unverified_user" in st.session_state:
@@ -218,27 +259,52 @@ def auth_view():
                 reg_tenant = st.selectbox("Select Tenant", options=tenant_names, key="reg_tenant")
                 reg_tenant_id = next((t['id'] for t in tenants if t['name'] == reg_tenant), None)
                 
-                if st.form_submit_button("Register", type="primary"):
-                    with st.spinner("Creating your account..."):
-                        success, message = register_user(
-                            username=reg_username,
-                            password=reg_password,
-                            email=reg_email,
-                            first_name=first_name,
-                            last_name=last_name,
-                            company=reg_company,
-                            tenant_id=reg_tenant_id
-                        )
-                    
-                    if success:
-                        st.success("✅ Registration successful. Please check your email to verify your account.")
-                        for key in ["reg_first_name", "reg_last_name", "reg_username", "reg_email", "reg_company", "reg_password", "reg_tenant"]:
-                            if key in st.session_state:
-                                del st.session_state[key]
+                # Add reCAPTCHA to registration form if available
+                recaptcha_response_register = None
+                if recaptcha:
+                    st.markdown('<div class="recaptcha-container">', unsafe_allow_html=True)
+                    recaptcha_response_register = recaptcha.render(key="register_recaptcha")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown("**Please complete the reCAPTCHA verification**", help="This helps us prevent automated attacks")
+                
+                register_submitted = st.form_submit_button("Register", type="primary")
+                
+                if register_submitted:
+                    # Verify reCAPTCHA if available
+                    if recaptcha:
+                        if not recaptcha_response_register:
+                            st.error("Please complete the reCAPTCHA verification.")
+                        elif not recaptcha.verify(recaptcha_response_register):
+                            st.error("reCAPTCHA verification failed. Please try again.")
+                        else:
+                            process_registration(reg_username, reg_password, reg_email, first_name, last_name, reg_company, reg_tenant_id)
                     else:
-                        st.error(f"❌ Registration failed: {message}")
+                        # Fallback without reCAPTCHA
+                        process_registration(reg_username, reg_password, reg_email, first_name, last_name, reg_company, reg_tenant_id)
     
     st.markdown('</div>', unsafe_allow_html=True)
+
+def process_registration(username, password, email, first_name, last_name, company, tenant_id):
+    """Process user registration"""
+    with st.spinner("Creating your account..."):
+        success, message = register_user(
+            username=username,
+            password=password,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            company=company,
+            tenant_id=tenant_id
+        )
+    
+    if success:
+        st.success("✅ Registration successful. Please check your email to verify your account.")
+        # Clear form fields
+        for key in ["reg_first_name", "reg_last_name", "reg_username", "reg_email", "reg_company", "reg_password", "reg_tenant"]:
+            if key in st.session_state:
+                del st.session_state[key]
+    else:
+        st.error(f"❌ Registration failed: {message}")
 
 # --- handle login ---
 def handle_login(username, password):
