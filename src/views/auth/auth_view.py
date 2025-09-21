@@ -101,6 +101,12 @@ def apply_auth_theme(theme):
             margin-top: 3px;
         }}
         
+        .password-match {{
+            margin-top: -15px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }}
+        
         @keyframes fadeIn {{
             from {{ opacity: 0; transform: translateY(10px); }}
             to {{ opacity: 1; transform: translateY(0); }}
@@ -254,6 +260,11 @@ def auth_view():
                 if reg_password:
                     show_password_strength(reg_password, theme)
                 
+                # Add Confirm Password field
+                confirm_password = st.text_input("Confirm Password", type="password", key="reg_confirm_password")
+                if reg_password and confirm_password:
+                    show_password_match(reg_password, confirm_password, theme)
+                
                 tenants = fetch_tenants()
                 tenant_names = [t['name'] for t in tenants] if tenants else []
                 reg_tenant = st.selectbox("Select Tenant", options=tenant_names, key="reg_tenant")
@@ -270,17 +281,21 @@ def auth_view():
                 register_submitted = st.form_submit_button("Register", type="primary")
                 
                 if register_submitted:
-                    # Verify reCAPTCHA if available
-                    if recaptcha:
-                        if not recaptcha_response_register:
-                            st.error("Please complete the reCAPTCHA verification.")
-                        elif not recaptcha.verify(recaptcha_response_register):
-                            st.error("reCAPTCHA verification failed. Please try again.")
-                        else:
-                            process_registration(reg_username, reg_password, reg_email, first_name, last_name, reg_company, reg_tenant_id)
+                    # First check if passwords match
+                    if reg_password != confirm_password:
+                        st.error("❌ Passwords do not match. Please make sure both passwords are identical.")
                     else:
-                        # Fallback without reCAPTCHA
-                        process_registration(reg_username, reg_password, reg_email, first_name, last_name, reg_company, reg_tenant_id)
+                        # Verify reCAPTCHA if available
+                        if recaptcha:
+                            if not recaptcha_response_register:
+                                st.error("Please complete the reCAPTCHA verification.")
+                            elif not recaptcha.verify(recaptcha_response_register):
+                                st.error("reCAPTCHA verification failed. Please try again.")
+                            else:
+                                process_registration(reg_username, reg_password, reg_email, first_name, last_name, reg_company, reg_tenant_id)
+                        else:
+                            # Fallback without reCAPTCHA
+                            process_registration(reg_username, reg_password, reg_email, first_name, last_name, reg_company, reg_tenant_id)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -300,7 +315,7 @@ def process_registration(username, password, email, first_name, last_name, compa
     if success:
         st.success("✅ Registration successful. Please check your email to verify your account.")
         # Clear form fields
-        for key in ["reg_first_name", "reg_last_name", "reg_username", "reg_email", "reg_company", "reg_password", "reg_tenant"]:
+        for key in ["reg_first_name", "reg_last_name", "reg_username", "reg_email", "reg_company", "reg_password", "reg_confirm_password", "reg_tenant"]:
             if key in st.session_state:
                 del st.session_state[key]
     else:
@@ -367,6 +382,22 @@ def show_password_strength(password, theme):
             </div>
         </div>
     """, unsafe_allow_html=True)
+
+def show_password_match(password, confirm_password, theme):
+    """Visual feedback for password confirmation"""
+    if password and confirm_password:
+        if password == confirm_password:
+            st.markdown(f"""
+                <div class="password-match" style="color: {theme['SUCCESS']};">
+                    ✅ Passwords match
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+                <div class="password-match" style="color: {theme['ERROR']};">
+                    ❌ Passwords do not match
+                </div>
+            """, unsafe_allow_html=True)
     
 def handle_email_verification():
     """Handle email verification within Streamlit"""
