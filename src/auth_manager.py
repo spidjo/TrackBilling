@@ -53,10 +53,11 @@ def register_user(username, password, email, first_name, last_name, company, ten
             conn = get_db_connection()
             cursor = conn.cursor()
             
+            # Use CURRENT_TIMESTAMP instead of NOW() for PostgreSQL compatibility
             cursor.execute("""
                 INSERT INTO users 
                 (username, password, first_name, last_name, company_name, email, verification_token, tenant_id, token_timestamp)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 RETURNING id
             """, (username, hashed_pw, first_name, last_name, company, validated_email, token, tenant_id))
             
@@ -83,6 +84,11 @@ def register_user(username, password, email, first_name, last_name, company, ten
             elif "users_email_key" in str(e):
                 return False, "Email already registered"
             return False, "Registration failed"
+            
+        except psycopg2.Error as e:
+            conn.rollback()
+            logger.error(f"Database error during registration for {username}: {str(e)}")
+            return False, f"Database error: {str(e)}"
             
         finally:
             if conn: conn.close()
@@ -137,14 +143,13 @@ def authenticate_user(username: str, password: str) -> tuple:
         if conn: conn.close()
 
 def verify_token(token: str) -> dict:
-    """Verify email verification token - SIMPLIFIED VERSION"""
+    """Verify email verification token"""
     logger.info(f"Attempting to verify token: {token}")
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Simplified query without timestamp check for debugging
         cursor.execute("""
             SELECT id, role FROM users 
             WHERE verification_token = %s
@@ -193,7 +198,7 @@ def resend_verification_email(username: str) -> dict:
         
         # Get user details
         cursor.execute("""
-            SELECT id, email, first_name, is_verified, last_verification_sent::timestamptz AS last_verification_sent 
+            SELECT id, email, first_name, is_verified, last_verification_sent 
             FROM users 
             WHERE username = %s
         """, (username,))
@@ -215,8 +220,7 @@ def resend_verification_email(username: str) -> dict:
         if last_sent:
             if isinstance(last_sent, str):
                 last_sent = parser.isoparse(last_sent)
-            # ensure last_sent is timezone-aware (should already be with timestamptz)
-            now = datetime.now(timezone.utc)  # timezone-aware current time
+            now = datetime.now(timezone.utc)
             if (now - last_sent) < timedelta(minutes=15):
                 remaining = timedelta(minutes=15) - (now - last_sent)
                 return {
@@ -226,7 +230,7 @@ def resend_verification_email(username: str) -> dict:
         
         # Generate new token
         new_token = secrets.token_urlsafe(32)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         logger.debug(f"Generated new token for {username}")
         
         # Update user record
@@ -256,8 +260,6 @@ def resend_verification_email(username: str) -> dict:
         return {"success": False, "error": str(e)}
     finally:
         if conn: conn.close()
-
-# Add this function to src/auth_manager.py
 
 def create_password_reset_token(user_id: int) -> str:
     """Create a password reset token for a user and return the token"""
