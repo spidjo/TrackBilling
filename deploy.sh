@@ -6,28 +6,25 @@
 # 0️⃣ Set variables
 # ------------------------------
 APP_DIR="/home/ubuntu/sgltrack"
-GIT_REPO="git@github.com:spidjo/TrackBilling.git"  # Replace with your repo
+GIT_REPO="git@github.com:spidjo/TrackBilling.git"
 DOMAIN="sgltrack.com"
 APP_SUBDOMAIN="app.sgltrack.com"
-EMAIL=$(echo "siphiwo@sgltrack.com" | openssl enc -base64)  # Encrypted email (base64)
+EMAIL=$(echo "siphiwo@sgltrack.com" | openssl enc -base64)
 RUN_AS_USER="ubuntu"
 
 # Burgundy color scheme
-PRIMARY_COLOR="#800020"      # Rich burgundy
-SECONDARY_COLOR="#600018"    # Darker burgundy
-ACCENT_COLOR="#A00028"       # Lighter burgundy
-LIGHT_BG="#F8F0F2"           # Light pinkish background
-TEXT_COLOR="#2D2D2D"         # Dark gray text
-WHITE="#FFFFFF"              # White
-
-# Logo configuration
-LOGO_URL="assets/logo.png"  # Placeholder logo
+PRIMARY_COLOR="#800020"
+SECONDARY_COLOR="#600018"
+ACCENT_COLOR="#A00028"
+LIGHT_BG="#F8F0F2"
+TEXT_COLOR="#2D2D2D"
+WHITE="#FFFFFF"
 
 # ------------------------------
 # 1️⃣ Update system & install base packages
 # ------------------------------
 apt update && apt upgrade -y
-apt install -y python3-venv python3-pip build-essential libpq-dev python3-dev nginx certbot python3-certbot-nginx git wget
+apt install -y python3-venv python3-pip build-essential libpq-dev python3-dev nginx certbot python3-certbot-nginx git
 
 # ------------------------------
 # 2️⃣ Clone or update app from GitHub as ubuntu user
@@ -38,7 +35,6 @@ else
     sudo -u "$RUN_AS_USER" bash -c "cd '$APP_DIR' && git reset --hard && git pull"
 fi
 
-# Set proper ownership
 chown -R "$RUN_AS_USER:$RUN_AS_USER" "$APP_DIR"
 
 # ------------------------------
@@ -48,7 +44,6 @@ if [ ! -d "$APP_DIR/venv" ]; then
     sudo -u "$RUN_AS_USER" python3 -m venv "$APP_DIR/venv"
 fi
 
-# Install dependencies as ubuntu user
 sudo -u "$RUN_AS_USER" bash <<EOF
 source "$APP_DIR/venv/bin/activate"
 pip install --upgrade pip setuptools wheel
@@ -77,24 +72,18 @@ RestartSec=5
 WantedBy=multi-user.target
 EOL
 
-# Enable & start service
 systemctl daemon-reload
 systemctl enable streamlit
 systemctl restart streamlit
 systemctl status streamlit --no-pager
 
 # ------------------------------
-# 5️⃣ Setup Nginx reverse proxy with professional landing page
+# 5️⃣ Setup Nginx with Professional Landing Page (Option 2 Logo)
 # ------------------------------
-# Create landing page directory
 mkdir -p /var/www/$DOMAIN/html
 mkdir -p /var/www/$DOMAIN/html/assets
 
-# Download logo
-echo "📱 Downloading logo..."
-wget -q -O /var/www/$DOMAIN/html/assets/logo.png "$LOGO_URL"
-
-# Create professional landing page HTML with logo
+# Create professional landing page HTML with Option 2 Logo
 cat > /var/www/$DOMAIN/html/index.html <<EOL
 <!DOCTYPE html>
 <html lang="en">
@@ -107,7 +96,6 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" type="image/x-icon" href="/assets/logo.png">
     <style>
         * {
             margin: 0;
@@ -129,6 +117,83 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             padding: 0 20px;
         }
 
+        /* Logo Styles - Option 2 */
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            transition: transform 0.3s ease;
+        }
+
+        .logo-container:hover {
+            transform: translateY(-2px);
+        }
+
+        .logo-icon {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, $PRIMARY_COLOR, $ACCENT_COLOR);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(128, 0, 32, 0.2);
+        }
+
+        .logo-icon::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .logo-icon-inner {
+            width: 25px;
+            height: 25px;
+            border: 2px solid white;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .logo-icon-inner::after {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            left: 3px;
+            right: 3px;
+            height: 6px;
+            background: white;
+            border-radius: 2px;
+        }
+
+        .logo-text {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: $PRIMARY_COLOR;
+            line-height: 1;
+        }
+
+        .logo-tagline {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 2px;
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+
         /* Header */
         header {
             background: $WHITE;
@@ -144,29 +209,6 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             justify-content: space-between;
             align-items: center;
             padding: 1rem 0;
-        }
-
-        .logo-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-        }
-
-        .logo-img {
-            height: 40px;
-            width: auto;
-            transition: transform 0.3s ease;
-        }
-
-        .logo-img:hover {
-            transform: scale(1.05);
-        }
-
-        .logo-text {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: $PRIMARY_COLOR;
         }
 
         .nav-links {
@@ -211,10 +253,33 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .hero-logo {
-            height: 80px;
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
             margin-bottom: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(128, 0, 32, 0.15);
+            padding: 1.5rem;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(128, 0, 32, 0.1);
+        }
+
+        .hero-logo .logo-icon {
+            width: 60px;
+            height: 60px;
+        }
+
+        .hero-logo .logo-icon-inner {
+            width: 35px;
+            height: 35px;
+        }
+
+        .hero-logo .logo-text {
+            font-size: 2.5rem;
+        }
+
+        .hero-logo .logo-tagline {
+            font-size: 0.9rem;
+            letter-spacing: 2px;
         }
 
         .hero h1 {
@@ -331,9 +396,25 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .cta-logo {
-            height: 60px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
             margin-bottom: 1.5rem;
-            filter: brightness(0) invert(1);
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .cta-logo .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .cta-logo .logo-text {
+            color: white;
+            font-size: 1.5rem;
         }
 
         .cta-section h2 {
@@ -375,8 +456,20 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .footer-logo {
-            height: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
             margin-bottom: 1rem;
+        }
+
+        .footer-logo .logo-icon {
+            width: 35px;
+            height: 35px;
+        }
+
+        .footer-logo .logo-text {
+            font-size: 1.3rem;
+            color: white;
         }
 
         .footer-content {
@@ -446,11 +539,21 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             }
 
             .logo-text {
-                font-size: 1.5rem;
+                font-size: 1.4rem;
+            }
+
+            .logo-tagline {
+                font-size: 0.6rem;
             }
 
             .hero-logo {
-                height: 60px;
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+
+            .hero-logo .logo-text {
+                font-size: 2rem;
             }
         }
     </style>
@@ -461,8 +564,13 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         <div class="container">
             <nav class="navbar">
                 <a href="/" class="logo-container">
-                    <img src="/assets/logo.png" alt="SglTrack Logo" class="logo-img">
-                    <span class="logo-text">SglTrack</span>
+                    <div class="logo-icon">
+                        <div class="logo-icon-inner"></div>
+                    </div>
+                    <div>
+                        <div class="logo-text">SglTrack</div>
+                        <div class="logo-tagline">SAAS BILLING</div>
+                    </div>
                 </a>
                 <ul class="nav-links">
                     <li><a href="#features">Features</a></li>
@@ -479,9 +587,17 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <img src="/assets/logo.png" alt="SglTrack" class="hero-logo">
-            <h1>Enterprise SaaS Billing Platform</h1>
-            <p>Streamline your billing operations with our comprehensive, multi-tenant SaaS billing solution. Secure, scalable, and built for modern businesses.</p>
+            <div class="hero-logo">
+                <div class="logo-icon">
+                    <div class="logo-icon-inner"></div>
+                </div>
+                <div>
+                    <div class="logo-text">SglTrack</div>
+                    <div class="logo-tagline">ENTERPRISE SAAS BILLING</div>
+                </div>
+            </div>
+            <h1>Streamline Your Billing Operations</h1>
+            <p>Comprehensive, multi-tenant SaaS billing solution. Secure, scalable, and built for modern businesses.</p>
             <div class="hero-buttons">
                 <a href="https://$APP_SUBDOMAIN" class="cta-button">
                     Get Started <i class="fas fa-rocket"></i>
@@ -550,7 +666,12 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
     <!-- CTA Section -->
     <section class="cta-section" id="about">
         <div class="container">
-            <img src="/assets/logo.png" alt="SglTrack" class="cta-logo">
+            <div class="cta-logo">
+                <div class="logo-icon">
+                    <div class="logo-icon-inner"></div>
+                </div>
+                <div class="logo-text">SglTrack</div>
+            </div>
             <h2>Ready to Transform Your Billing?</h2>
             <p>Join hundreds of businesses that trust SglTrack for their billing operations. Get started in minutes.</p>
             <a href="https://$APP_SUBDOMAIN" class="cta-button-light">
@@ -564,8 +685,12 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         <div class="container">
             <div class="footer-content">
                 <div class="footer-column">
-                    <img src="/assets/logo.png" alt="SglTrack" class="footer-logo">
-                    <h3>SglTrack</h3>
+                    <div class="footer-logo">
+                        <div class="logo-icon">
+                            <div class="logo-icon-inner"></div>
+                        </div>
+                        <div class="logo-text">SglTrack</div>
+                    </div>
                     <p>Enterprise-grade SaaS billing platform designed for modern businesses seeking efficiency and scalability.</p>
                 </div>
                 <div class="footer-column">
@@ -622,6 +747,8 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 </html>
 EOL
 
+# ... [Rest of the deployment script remains the same for Nginx, SSL, auto-update, etc.]
+
 # Create Nginx configuration for landing page
 cat > /etc/nginx/sites-available/$DOMAIN <<EOL
 server {
@@ -653,13 +780,6 @@ server {
     # Cache static assets
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
         expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # Logo assets
-    location /assets/ {
-        access_log off;
-        expires 30d;
         add_header Cache-Control "public, immutable";
     }
 }
@@ -717,7 +837,7 @@ systemctl reload nginx
 certbot --nginx -d $DOMAIN -d www.$DOMAIN -d $APP_SUBDOMAIN --redirect --non-interactive --agree-tos -m $(echo $EMAIL | openssl enc -base64 -d)
 
 # ------------------------------
-# 7️⃣ Create auto-update script (matching your desired format)
+# 7️⃣ Create auto-update script
 # ------------------------------
 AUTO_UPDATE_SCRIPT="/usr/local/bin/trackbilling_update.sh"
 
@@ -777,7 +897,6 @@ chmod +x $AUTO_UPDATE_SCRIPT
 # ------------------------------
 # 8️⃣ Setup cron job to auto-update every 5 minutes
 # ------------------------------
-# Add to ubuntu user's crontab
 sudo -u "$RUN_AS_USER" bash -c "(crontab -l 2>/dev/null; echo '*/5 * * * * /usr/local/bin/trackbilling_update.sh >> /var/log/trackbilling_update.log 2>&1') | crontab -"
 
 # ------------------------------
@@ -786,29 +905,18 @@ sudo -u "$RUN_AS_USER" bash -c "(crontab -l 2>/dev/null; echo '*/5 * * * * /usr/
 chown -R www-data:www-data /var/www/$DOMAIN
 chmod -R 755 /var/www/$DOMAIN
 
-# Ensure ubuntu user can write to log file
 touch /var/log/trackbilling_update.log
 chown "$RUN_AS_USER:$RUN_AS_USER" /var/log/trackbilling_update.log
 chmod 644 /var/log/trackbilling_update.log
 
-# Configure sudo permissions for streamlit service restart
 if ! grep -q "ubuntu ALL=(root) NOPASSWD: /bin/systemctl restart streamlit.service" /etc/sudoers; then
     echo "ubuntu ALL=(root) NOPASSWD: /bin/systemctl restart streamlit.service" >> /etc/sudoers.d/trackbilling
     chmod 440 /etc/sudoers.d/trackbilling
 fi
 
-echo "✅ Deployment & auto-update setup completed!"
+echo "✅ Deployment completed with Option 2 Logo!"
 echo "🎯 Landing page: https://$DOMAIN"
 echo "🚀 App: https://$APP_SUBDOMAIN"
 echo "👤 Running as user: $RUN_AS_USER"
-echo "📊 Auto-update cron job running every 5 minutes"
-echo "🎨 Professional burgundy-themed landing page deployed"
-echo "📱 Logo integrated into landing page"
-
-# Instructions for custom logo
-echo ""
-echo "📝 To use your custom logo:"
-echo "1. Replace /var/www/$DOMAIN/html/assets/logo.png with your logo file"
-echo "2. Ensure the logo is in PNG format and optimized for web"
-echo "3. Recommended size: 200x60 pixels for best results"
-echo "4. Run: sudo systemctl reload nginx"
+echo "🎨 Option 2 Logo integrated throughout the site"
+echo "✨ Features: Animated icon, responsive design, burgundy color scheme"
