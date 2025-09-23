@@ -6,10 +6,11 @@
 # 0️⃣ Set variables
 # ------------------------------
 APP_DIR="/home/ubuntu/sgltrack"
-GIT_REPO="git@github.com:spidjo/TrackBilling.git"  # Replace with your repo
+GIT_REPO="git@github.com:spidjo/TrackBilling.git" 
 DOMAIN="sgltrack.com"
 APP_SUBDOMAIN="app.sgltrack.com"
 EMAIL=$(echo "siphiwo@sgltrack.com" | openssl enc -base64)  # Encrypted email (base64)
+RUN_AS_USER="ubuntu"
 
 # Burgundy color scheme
 PRIMARY_COLOR="#800020"      # Rich burgundy
@@ -26,34 +27,31 @@ apt update && apt upgrade -y
 apt install -y python3-venv python3-pip build-essential libpq-dev python3-dev nginx certbot python3-certbot-nginx git
 
 # ------------------------------
-# 2️⃣ Clone or update app from GitHub
+# 2️⃣ Clone or update app from GitHub as ubuntu user
 # ------------------------------
 if [ ! -d "$APP_DIR" ]; then
-    git clone "$GIT_REPO" "$APP_DIR"
+    sudo -u "$RUN_AS_USER" git clone "$GIT_REPO" "$APP_DIR"
 else
-    cd "$APP_DIR"
-    git reset --hard
-    git pull
+    sudo -u "$RUN_AS_USER" bash -c "cd '$APP_DIR' && git reset --hard && git pull"
 fi
 
-cd "$APP_DIR"
+# Set proper ownership
+chown -R "$RUN_AS_USER:$RUN_AS_USER" "$APP_DIR"
 
 # ------------------------------
-# 3️⃣ Create virtual environment if not exists
+# 3️⃣ Create virtual environment if not exists as ubuntu user
 # ------------------------------
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
+if [ ! -d "$APP_DIR/venv" ]; then
+    sudo -u "$RUN_AS_USER" python3 -m venv "$APP_DIR/venv"
 fi
 
-source venv/bin/activate
-
-# Upgrade pip and setuptools
+# Install dependencies as ubuntu user
+sudo -u "$RUN_AS_USER" bash <<EOF
+source "$APP_DIR/venv/bin/activate"
 pip install --upgrade pip setuptools wheel
-
-# Install requirements
-pip install -r requirements.txt || pip install psycopg2-binary==2.9.10
-
+pip install -r "$APP_DIR/requirements.txt" || pip install psycopg2-binary==2.9.10
 deactivate
+EOF
 
 # ------------------------------
 # 4️⃣ Create systemd service for Streamlit
@@ -64,11 +62,13 @@ Description=SglTrack SaaS Billing Platform
 After=network.target
 
 [Service]
-User=ubuntu
-Group=ubuntu
+User=$RUN_AS_USER
+Group=$RUN_AS_USER
 WorkingDirectory=$APP_DIR
+Environment=PATH=$APP_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=$APP_DIR/venv/bin/streamlit run src/main.py --server.port 8501 --server.address 127.0.0.1
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -530,7 +530,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
                 <div class="footer-column">
                     <h3>Contact Info</h3>
                     <ul>
-                        <li><i class="fas fa-envelope"></i> siphiwol@sgltrack.com</li>
+                        <li><i class="fas fa-envelope"></i> siphiwo@sgltrack.com</li>
                         <li><i class="fas fa-globe"></i> $DOMAIN</li>
                     </ul>
                 </div>
@@ -660,59 +660,89 @@ systemctl reload nginx
 certbot --nginx -d $DOMAIN -d www.$DOMAIN -d $APP_SUBDOMAIN --redirect --non-interactive --agree-tos -m $(echo $EMAIL | openssl enc -base64 -d)
 
 # ------------------------------
-# 7️⃣ Create auto-update script
+# 7️⃣ Create auto-update script (matching your desired format)
 # ------------------------------
 AUTO_UPDATE_SCRIPT="/usr/local/bin/trackbilling_update.sh"
 
-cat > $AUTO_UPDATE_SCRIPT <<EOL
+cat > $AUTO_UPDATE_SCRIPT <<'EOL'
 #!/bin/bash
-cd $APP_DIR
-git reset --hard
-git pull
-source $APP_DIR/venv/bin/activate
-pip install -r requirements.txt || pip install psycopg2-binary==2.9.10
-deactivate
-sudo systemctl restart streamlit
+#
+# TrackBilling auto-update script
+#
 
-# Update landing page if needed
-if [ -f "/var/www/$DOMAIN/html/index.html" ]; then
-    # Backup current landing page
-    cp /var/www/$DOMAIN/html/index.html /tmp/landing_backup.html
-    # Recreate with updated variables (simplified version)
-    cat > /var/www/$DOMAIN/html/index.html <<EOF
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>SglTrack - Enterprise SaaS Billing Platform</title>
-    <!-- Landing page content would be regenerated here -->
-</head>
-<body>
-    <h1>SglTrack SaaS Billing Platform</h1>
-    <p><a href="https://$APP_SUBDOMAIN">Launch Application</a></p>
-</body>
-</html>
-EOF
+LOG_PREFIX="[$(date '+%a %b %d %H:%M:%S %Z %Y')]"
+
+REPO_DIR="/home/ubuntu/sgltrack"
+RUN_AS_USER="ubuntu"
+VENV_DIR="$REPO_DIR/venv"
+
+echo "$LOG_PREFIX ===== TrackBilling update started ====="
+
+if [ ! -d "$REPO_DIR/.git" ]; then
+    echo "$LOG_PREFIX ❌ Repo not found at $REPO_DIR"
+    exit 1
 fi
 
-echo "\$(date): TrackBilling updated successfully" >> /var/log/trackbilling_update.log
+sudo -u "$RUN_AS_USER" bash <<EOF
+cd "$REPO_DIR" || exit 1
+chown -R $RUN_AS_USER:$RUN_AS_USER "$REPO_DIR"
+
+git fetch origin main
+
+LOCAL=\$(git rev-parse HEAD)
+REMOTE=\$(git rev-parse origin/main)
+
+if [ "\$LOCAL" != "\$REMOTE" ]; then
+    echo "$LOG_PREFIX 🔄 Updating repository..."
+    git reset --hard origin/main
+
+    if [ -f "$VENV_DIR/bin/activate" ]; then
+        source "$VENV_DIR/bin/activate"
+        pip install --quiet --break-system-packages -r requirements.txt
+        echo "$LOG_PREFIX 📦 Dependencies installed"
+    else
+        echo "$LOG_PREFIX ⚠️ Virtualenv not found at $VENV_DIR"
+    fi
+
+    # Restart Streamlit (passwordless sudo required)
+    sudo systemctl restart streamlit.service
+    echo "$LOG_PREFIX ✅ Streamlit service restarted successfully"
+else
+    echo "$LOG_PREFIX ⏩ No updates found. Nothing to do."
+fi
+EOF
+
+echo "$LOG_PREFIX ===== TrackBilling update completed ====="
 EOL
 
 chmod +x $AUTO_UPDATE_SCRIPT
 
 # ------------------------------
-# 8️⃣ Setup cron job to auto-update every hour
+# 8️⃣ Setup cron job to auto-update every 5 minutes
 # ------------------------------
-(crontab -l 2>/dev/null; echo "*/5 * * * * $AUTO_UPDATE_SCRIPT >> /var/log/trackbilling_update.log 2>&1") | crontab -
+# Add to ubuntu user's crontab
+sudo -u "$RUN_AS_USER" bash -c "(crontab -l 2>/dev/null; echo '*/5 * * * * /usr/local/bin/trackbilling_update.sh >> /var/log/trackbilling_update.log 2>&1') | crontab -"
 
 # ------------------------------
 # 9️⃣ Set proper permissions
 # ------------------------------
-chown -R ubuntu:ubuntu /var/www/$DOMAIN
+chown -R www-data:www-data /var/www/$DOMAIN
 chmod -R 755 /var/www/$DOMAIN
+
+# Ensure ubuntu user can write to log file
+touch /var/log/trackbilling_update.log
+chown "$RUN_AS_USER:$RUN_AS_USER" /var/log/trackbilling_update.log
+chmod 644 /var/log/trackbilling_update.log
+
+# Configure sudo permissions for streamlit service restart
+if ! grep -q "ubuntu ALL=(root) NOPASSWD: /bin/systemctl restart streamlit.service" /etc/sudoers; then
+    echo "ubuntu ALL=(root) NOPASSWD: /bin/systemctl restart streamlit.service" >> /etc/sudoers.d/trackbilling
+    chmod 440 /etc/sudoers.d/trackbilling
+fi
 
 echo "✅ Deployment & auto-update setup completed!"
 echo "🎯 Landing page: https://$DOMAIN"
 echo "🚀 App: https://$APP_SUBDOMAIN"
+echo "👤 Running as user: $RUN_AS_USER"
 echo "📊 Auto-update cron job running every 5 minutes"
 echo "🎨 Professional burgundy-themed landing page deployed"
