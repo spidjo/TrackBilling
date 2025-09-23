@@ -672,7 +672,7 @@ git pull
 source $APP_DIR/venv/bin/activate
 pip install -r requirements.txt || pip install psycopg2-binary==2.9.10
 deactivate
-systemctl restart streamlit
+sudo systemctl restart streamlit
 
 # Update landing page if needed
 if [ -f "/var/www/$DOMAIN/html/index.html" ]; then
