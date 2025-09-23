@@ -6,7 +6,7 @@
 # 0️⃣ Set variables
 # ------------------------------
 APP_DIR="/home/ubuntu/sgltrack"
-GIT_REPO="git@github.com:spidjo/TrackBilling.git" 
+GIT_REPO="git@github.com:spidjo/TrackBilling.git"  # Replace with your repo
 DOMAIN="sgltrack.com"
 APP_SUBDOMAIN="app.sgltrack.com"
 EMAIL=$(echo "siphiwo@sgltrack.com" | openssl enc -base64)  # Encrypted email (base64)
@@ -20,11 +20,14 @@ LIGHT_BG="#F8F0F2"           # Light pinkish background
 TEXT_COLOR="#2D2D2D"         # Dark gray text
 WHITE="#FFFFFF"              # White
 
+# Logo configuration
+LOGO_URL="https://via.placeholder.com/200x60/800020/ffffff?text=SglTrack"  # Placeholder logo
+
 # ------------------------------
 # 1️⃣ Update system & install base packages
 # ------------------------------
 apt update && apt upgrade -y
-apt install -y python3-venv python3-pip build-essential libpq-dev python3-dev nginx certbot python3-certbot-nginx git
+apt install -y python3-venv python3-pip build-essential libpq-dev python3-dev nginx certbot python3-certbot-nginx git wget
 
 # ------------------------------
 # 2️⃣ Clone or update app from GitHub as ubuntu user
@@ -87,7 +90,11 @@ systemctl status streamlit --no-pager
 mkdir -p /var/www/$DOMAIN/html
 mkdir -p /var/www/$DOMAIN/html/assets
 
-# Create professional landing page HTML
+# Download logo
+echo "📱 Downloading logo..."
+wget -q -O /var/www/$DOMAIN/html/assets/logo.png "$LOGO_URL"
+
+# Create professional landing page HTML with logo
 cat > /var/www/$DOMAIN/html/index.html <<EOL
 <!DOCTYPE html>
 <html lang="en">
@@ -100,6 +107,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="/assets/logo.png">
     <style>
         * {
             margin: 0;
@@ -138,15 +146,27 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             padding: 1rem 0;
         }
 
-        .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: $PRIMARY_COLOR;
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             text-decoration: none;
         }
 
-        .logo i {
-            margin-right: 8px;
+        .logo-img {
+            height: 40px;
+            width: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .logo-img:hover {
+            transform: scale(1.05);
+        }
+
+        .logo-text {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: $PRIMARY_COLOR;
         }
 
         .nav-links {
@@ -188,6 +208,13 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             padding: 160px 0 80px;
             text-align: center;
             background: linear-gradient(135deg, $WHITE 0%, $LIGHT_BG 100%);
+        }
+
+        .hero-logo {
+            height: 80px;
+            margin-bottom: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(128, 0, 32, 0.15);
         }
 
         .hero h1 {
@@ -303,6 +330,12 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             text-align: center;
         }
 
+        .cta-logo {
+            height: 60px;
+            margin-bottom: 1.5rem;
+            filter: brightness(0) invert(1);
+        }
+
         .cta-section h2 {
             font-size: 2.5rem;
             margin-bottom: 1rem;
@@ -339,6 +372,11 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             background: $TEXT_COLOR;
             color: $WHITE;
             padding: 3rem 0 1rem;
+        }
+
+        .footer-logo {
+            height: 40px;
+            margin-bottom: 1rem;
         }
 
         .footer-content {
@@ -406,6 +444,14 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             .features-grid {
                 grid-template-columns: 1fr;
             }
+
+            .logo-text {
+                font-size: 1.5rem;
+            }
+
+            .hero-logo {
+                height: 60px;
+            }
         }
     </style>
 </head>
@@ -414,8 +460,9 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
     <header>
         <div class="container">
             <nav class="navbar">
-                <a href="/" class="logo">
-                    <i class="fas fa-chart-line"></i>SglTrack
+                <a href="/" class="logo-container">
+                    <img src="/assets/logo.png" alt="SglTrack Logo" class="logo-img">
+                    <span class="logo-text">SglTrack</span>
                 </a>
                 <ul class="nav-links">
                     <li><a href="#features">Features</a></li>
@@ -432,6 +479,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
+            <img src="/assets/logo.png" alt="SglTrack" class="hero-logo">
             <h1>Enterprise SaaS Billing Platform</h1>
             <p>Streamline your billing operations with our comprehensive, multi-tenant SaaS billing solution. Secure, scalable, and built for modern businesses.</p>
             <div class="hero-buttons">
@@ -502,6 +550,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
     <!-- CTA Section -->
     <section class="cta-section" id="about">
         <div class="container">
+            <img src="/assets/logo.png" alt="SglTrack" class="cta-logo">
             <h2>Ready to Transform Your Billing?</h2>
             <p>Join hundreds of businesses that trust SglTrack for their billing operations. Get started in minutes.</p>
             <a href="https://$APP_SUBDOMAIN" class="cta-button-light">
@@ -515,6 +564,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         <div class="container">
             <div class="footer-content">
                 <div class="footer-column">
+                    <img src="/assets/logo.png" alt="SglTrack" class="footer-logo">
                     <h3>SglTrack</h3>
                     <p>Enterprise-grade SaaS billing platform designed for modern businesses seeking efficiency and scalability.</p>
                 </div>
@@ -603,6 +653,13 @@ server {
     # Cache static assets
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
         expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Logo assets
+    location /assets/ {
+        access_log off;
+        expires 30d;
         add_header Cache-Control "public, immutable";
     }
 }
@@ -746,3 +803,12 @@ echo "🚀 App: https://$APP_SUBDOMAIN"
 echo "👤 Running as user: $RUN_AS_USER"
 echo "📊 Auto-update cron job running every 5 minutes"
 echo "🎨 Professional burgundy-themed landing page deployed"
+echo "📱 Logo integrated into landing page"
+
+# Instructions for custom logo
+echo ""
+echo "📝 To use your custom logo:"
+echo "1. Replace /var/www/$DOMAIN/html/assets/logo.png with your logo file"
+echo "2. Ensure the logo is in PNG format and optimized for web"
+echo "3. Recommended size: 200x60 pixels for best results"
+echo "4. Run: sudo systemctl reload nginx"
