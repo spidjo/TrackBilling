@@ -13,15 +13,15 @@ EMAIL=$(echo "siphiwo@sgltrack.com" | openssl enc -base64)
 RUN_AS_USER="ubuntu"
 
 # Enhanced Color Scheme - Burgundy + Teal (Option B)
-PRIMARY_COLOR="#800020"      /* Rich Burgundy */
-SECONDARY_COLOR="#600018"    /* Darker Burgundy */
-ACCENT_COLOR="#A00028"       /* Lighter Burgundy */
-TEAL_COLOR="#008080"         /* Sophisticated Teal */
-LIGHT_TEAL="#E0F2F1"         /* Light Teal Background */
-NAVY_BLUE="#003366"          /* Deep Navy */
-LIGHT_BG="#F8F9FA"           /* Light Gray Background */
-TEXT_COLOR="#2D2D2D"         /* Dark Gray Text */
-WHITE="#FFFFFF"              /* White */
+PRIMARY_COLOR="#800020"      # Rich Burgundy
+SECONDARY_COLOR="#600018"    # Darker Burgundy
+ACCENT_COLOR="#A00028"       # Lighter Burgundy
+TEAL_COLOR="#008080"         # Sophisticated Teal
+LIGHT_TEAL="#E0F2F1"         # Light Teal Background
+NAVY_BLUE="#003366"          # Deep Navy
+LIGHT_BG="#F8F9FA"           # Light Gray Background
+TEXT_COLOR="#2D2D2D"         # Dark Gray Text
+WHITE="#FFFFFF"              # White
 
 # ------------------------------
 # 1️⃣ Update system & install base packages
@@ -81,12 +81,12 @@ systemctl restart streamlit
 systemctl status streamlit --no-pager
 
 # ------------------------------
-# 5️⃣ Setup Nginx with Professional Landing Page (Option 2 Logo)
+# 5️⃣ Setup Nginx with Professional Landing Page (Fixed Color Scheme)
 # ------------------------------
 mkdir -p /var/www/$DOMAIN/html
 mkdir -p /var/www/$DOMAIN/html/assets
 
-# Create professional landing page HTML with enhanced color scheme
+# Create professional landing page HTML with FIXED color scheme
 cat > /var/www/$DOMAIN/html/index.html <<EOL
 <!DOCTYPE html>
 <html lang="en">
@@ -148,7 +148,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         .logo-icon {
             width: 45px;
             height: 45px;
-            background: linear-gradient(135deg, var(--burgundy-primary), var(--teal-primary));
+            background: linear-gradient(135deg, $PRIMARY_COLOR, $TEAL_COLOR);
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -197,7 +197,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             font-family: 'Inter', sans-serif;
             font-weight: 700;
             font-size: 1.8rem;
-            background: linear-gradient(135deg, var(--burgundy-primary), var(--teal-primary));
+            background: linear-gradient(135deg, $PRIMARY_COLOR, $TEAL_COLOR);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -206,7 +206,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 
         .logo-tagline {
             font-size: 0.7rem;
-            color: var(--teal-primary);
+            color: $TEAL_COLOR;
             margin-top: 2px;
             letter-spacing: 1px;
             font-weight: 500;
@@ -214,7 +214,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 
         /* Enhanced Header */
         header {
-            background: var(--white);
+            background: $WHITE;
             box-shadow: 0 2px 20px rgba(128, 0, 32, 0.1);
             position: fixed;
             width: 100%;
@@ -237,14 +237,14 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 
         .nav-links a {
             text-decoration: none;
-            color: var(--text-dark);
+            color: $TEXT_COLOR;
             font-weight: 500;
             transition: all 0.3s ease;
             position: relative;
         }
 
         .nav-links a:hover {
-            color: var(--burgundy-primary);
+            color: $PRIMARY_COLOR;
         }
 
         .nav-links a::after {
@@ -254,7 +254,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             left: 0;
             width: 0;
             height: 2px;
-            background: linear-gradient(90deg, var(--burgundy-primary), var(--teal-primary));
+            background: linear-gradient(90deg, $PRIMARY_COLOR, $TEAL_COLOR);
             transition: width 0.3s ease;
         }
 
@@ -263,7 +263,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .cta-button {
-            background: linear-gradient(135deg, var(--burgundy-primary), var(--teal-primary));
+            background: linear-gradient(135deg, $PRIMARY_COLOR, $TEAL_COLOR);
             color: white;
             padding: 0.75rem 1.5rem;
             border-radius: 8px;
@@ -283,7 +283,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         .hero {
             padding: 160px 0 80px;
             text-align: center;
-            background: linear-gradient(135deg, var(--white) 0%, var(--teal-light) 100%);
+            background: linear-gradient(135deg, $WHITE 0%, $LIGHT_TEAL 100%);
             position: relative;
             overflow: hidden;
         }
@@ -295,7 +295,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             right: -10%;
             width: 300px;
             height: 300px;
-            background: linear-gradient(45deg, var(--burgundy-primary), transparent);
+            background: linear-gradient(45deg, $PRIMARY_COLOR, transparent);
             border-radius: 50%;
             opacity: 0.1;
         }
@@ -307,7 +307,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             left: -10%;
             width: 400px;
             height: 400px;
-            background: linear-gradient(45deg, var(--teal-primary), transparent);
+            background: linear-gradient(45deg, $TEAL_COLOR, transparent);
             border-radius: 50%;
             opacity: 0.1;
         }
@@ -318,7 +318,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             gap: 15px;
             margin-bottom: 2rem;
             padding: 1.5rem;
-            background: var(--white);
+            background: $WHITE;
             border-radius: 20px;
             box-shadow: 0 10px 40px rgba(0, 128, 128, 0.1);
             position: relative;
@@ -348,7 +348,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
             font-size: 3.5rem;
             font-weight: 700;
             margin-bottom: 1rem;
-            background: linear-gradient(135deg, var(--burgundy-primary), var(--teal-primary));
+            background: linear-gradient(135deg, $PRIMARY_COLOR, $TEAL_COLOR);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -358,7 +358,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 
         .hero p {
             font-size: 1.3rem;
-            color: var(--navy-blue);
+            color: $NAVY_BLUE;
             margin-bottom: 2rem;
             max-width: 600px;
             margin-left: auto;
@@ -378,17 +378,17 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 
         .secondary-button {
             background: transparent;
-            color: var(--burgundy-primary);
+            color: $PRIMARY_COLOR;
             padding: 0.75rem 1.5rem;
             border-radius: 8px;
             text-decoration: none;
             font-weight: 600;
             transition: all 0.3s ease;
-            border: 2px solid var(--burgundy-primary);
+            border: 2px solid $PRIMARY_COLOR;
         }
 
         .secondary-button:hover {
-            background: var(--burgundy-primary);
+            background: $PRIMARY_COLOR;
             color: white;
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(128, 0, 32, 0.3);
@@ -397,7 +397,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         /* Enhanced Features Section */
         .features {
             padding: 80px 0;
-            background: var(--white);
+            background: $WHITE;
         }
 
         .section-title {
@@ -407,7 +407,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 
         .section-title h2 {
             font-size: 2.5rem;
-            background: linear-gradient(135deg, var(--burgundy-primary), var(--teal-primary));
+            background: linear-gradient(135deg, $PRIMARY_COLOR, $TEAL_COLOR);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -415,7 +415,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .section-title p {
-            color: var(--navy-blue);
+            color: $NAVY_BLUE;
             font-size: 1.1rem;
             max-width: 600px;
             margin: 0 auto;
@@ -429,13 +429,13 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .feature-card {
-            background: var(--white);
+            background: $WHITE;
             padding: 2rem;
             border-radius: 12px;
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
             border-top: 4px solid;
-            border-image: linear-gradient(135deg, var(--burgundy-primary), var(--teal-primary)) 1;
+            border-image: linear-gradient(135deg, $PRIMARY_COLOR, $TEAL_COLOR) 1;
         }
 
         .feature-card:hover {
@@ -445,7 +445,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 
         .feature-icon {
             font-size: 2.5rem;
-            background: linear-gradient(135deg, var(--burgundy-primary), var(--teal-primary));
+            background: linear-gradient(135deg, $PRIMARY_COLOR, $TEAL_COLOR);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -455,7 +455,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         .feature-card h3 {
             font-size: 1.3rem;
             margin-bottom: 1rem;
-            color: var(--text-dark);
+            color: $TEXT_COLOR;
         }
 
         .feature-card p {
@@ -466,7 +466,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         /* Enhanced CTA Section */
         .cta-section {
             padding: 80px 0;
-            background: linear-gradient(135deg, var(--burgundy-primary), var(--navy-blue));
+            background: linear-gradient(135deg, $PRIMARY_COLOR, $NAVY_BLUE);
             color: white;
             text-align: center;
             position: relative;
@@ -529,28 +529,28 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .cta-button-light {
-            background: var(--white);
-            color: var(--burgundy-primary);
+            background: $WHITE;
+            color: $PRIMARY_COLOR;
             padding: 0.75rem 1.5rem;
             border-radius: 8px;
             text-decoration: none;
             font-weight: 600;
             transition: all 0.3s ease;
-            border: 2px solid var(--white);
+            border: 2px solid $WHITE;
             position: relative;
             z-index: 2;
         }
 
         .cta-button-light:hover {
             background: transparent;
-            color: var(--white);
+            color: $WHITE;
             transform: translateY(-2px);
         }
 
         /* Enhanced Footer */
         footer {
-            background: var(--navy-blue);
-            color: var(--white);
+            background: $NAVY_BLUE;
+            color: $WHITE;
             padding: 3rem 0 1rem;
         }
 
@@ -581,7 +581,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .footer-column h3 {
-            color: var(--white);
+            color: $WHITE;
             margin-bottom: 1rem;
             font-size: 1.2rem;
         }
@@ -601,7 +601,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
         }
 
         .footer-column ul li a:hover {
-            color: var(--teal-primary);
+            color: $TEAL_COLOR;
         }
 
         .footer-bottom {
@@ -718,7 +718,6 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
                 <p>Everything you need to manage your billing operations efficiently</p>
             </div>
             <div class="features-grid">
-                <!-- Features cards remain the same -->
                 <div class="feature-card">
                     <div class="feature-icon">
                         <i class="fas fa-users"></i>
@@ -726,7 +725,41 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
                     <h3>Multi-Tenant Architecture</h3>
                     <p>Serve multiple clients with complete data isolation and customized billing solutions.</p>
                 </div>
-                <!-- ... other feature cards ... -->
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3>Enterprise Security</h3>
+                    <p>Bank-level security with encryption, secure authentication, and compliance-ready infrastructure.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3>Advanced Analytics</h3>
+                    <p>Comprehensive reporting and analytics to track revenue, usage patterns, and business performance.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <h3>Automated Billing</h3>
+                    <p>Automate recurring billing, invoicing, and payment processing with flexible billing cycles.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h3>Responsive Design</h3>
+                    <p>Access your billing platform from any device with our fully responsive and mobile-friendly interface.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-cloud"></i>
+                    </div>
+                    <h3>Cloud Native</h3>
+                    <p>Built for the cloud with scalability, reliability, and high availability as core principles.</p>
+                </div>
             </div>
         </div>
     </section>
@@ -761,7 +794,25 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
                     </div>
                     <p>Enterprise-grade SaaS billing platform designed for modern businesses.</p>
                 </div>
-                <!-- ... footer content ... -->
+                <div class="footer-column">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="https://$APP_SUBDOMAIN">Launch Application</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#about">About Us</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Contact Info</h3>
+                    <ul>
+                        <li><i class="fas fa-envelope"></i> siphiwo@sgltrack.com</li>
+                        <li><i class="fas fa-globe"></i> $DOMAIN</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 SglTrack. All rights reserved. | Enterprise SaaS Billing Platform</p>
             </div>
         </div>
     </footer>
@@ -787,7 +838,7 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
                 header.style.background = 'rgba(255, 255, 255, 0.95)';
                 header.style.backdropFilter = 'blur(10px)';
             } else {
-                header.style.background = 'var(--white)';
+                header.style.background = '$WHITE';
                 header.style.backdropFilter = 'none';
             }
         });
@@ -795,8 +846,6 @@ cat > /var/www/$DOMAIN/html/index.html <<EOL
 </body>
 </html>
 EOL
-
-# ... [Rest of the deployment script remains the same for Nginx, SSL, auto-update, etc.]
 
 # Create Nginx configuration for landing page
 cat > /etc/nginx/sites-available/$DOMAIN <<EOL
