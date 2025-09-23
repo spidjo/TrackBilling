@@ -21,7 +21,7 @@ TEXT_COLOR="#2D2D2D"         # Dark gray text
 WHITE="#FFFFFF"              # White
 
 # Logo configuration
-LOGO_URL="https://via.placeholder.com/200x60/800020/ffffff?text=SglTrack"  # Placeholder logo
+LOGO_URL="assets/logo.png"  # Placeholder logo
 
 # ------------------------------
 # 1️⃣ Update system & install base packages
