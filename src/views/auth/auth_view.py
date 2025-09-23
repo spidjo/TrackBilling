@@ -31,7 +31,7 @@ except ImportError:
 
 def get_logo_base64():
     # Replace with your actual logo path or base64 encoded string
-    logo_path = "logo.png"  # Placeholder
+    logo_path = "assets/logo.png"  # Placeholder
     try:
         with open(logo_path, "rb") as f:
             return base64.b64encode(f.read()).decode()
