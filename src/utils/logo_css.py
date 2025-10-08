@@ -150,15 +150,41 @@ def get_logo_css():
         .logo-white .logo-tagline {
             color: rgba(255, 255, 255, 0.8);
         }
+
+        /* Sidebar logo styling */
+        .sidebar-logo {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .sidebar-logo .logo-container {
+            justify-content: center;
+        }
+
+        /* Auth logo styling */
+        .auth-logo-container {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .auth-logo-container .logo-container {
+            justify-content: center;
+        }
     </style>
     """
 
-def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False):
+def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False, container_class=""):
     """Render logo HTML with specified size and options"""
     size_class = f"logo-{size}" if size != "normal" else ""
     color_class = "logo-white" if white_text else ""
     
-    return f"""
+    logo_html = f"""
     <div class="logo-container {size_class} {color_class}">
         <div class="logo-icon">
             <div class="logo-icon-inner"></div>
@@ -169,3 +195,9 @@ def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLIN
         </div>
     </div>
     """
+    
+    # Wrap in container if specified
+    if container_class:
+        logo_html = f'<div class="{container_class}">{logo_html}</div>'
+    
+    return logo_html

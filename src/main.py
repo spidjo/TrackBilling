@@ -63,7 +63,7 @@ try:
 except ImportError:
     def get_logo_css():
         return ""
-    def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False):
+    def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False, container_class=""):
         return f"<div>SglTrack {tagline_text}</div>"
 
 # --- Lazy Imports ---
@@ -155,16 +155,16 @@ def handle_token_verification(token: str):
     theme = DARK_THEME if st.session_state.get("dark_mode", False) else LIGHT_THEME
     apply_theme(theme)
     
-    # Render logo using shared component
+    # Render logo using shared component with container
     st.markdown(
-        f'<div style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: {theme["CARD"]}; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">',
+        render_logo_html(
+            size="hero", 
+            show_tagline=True, 
+            tagline_text="EMAIL VERIFICATION",
+            container_class="auth-logo-container"
+        ),
         unsafe_allow_html=True
     )
-    st.markdown(
-        render_logo_html(size="hero", show_tagline=True, tagline_text="EMAIL VERIFICATION"),
-        unsafe_allow_html=True
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
     
     if result.get("success"):
         # Success layout
@@ -317,16 +317,14 @@ def apply_theme(theme):
             background: {theme["ACCENT_DARK"]};
         }}
 
-        /* Sidebar logo styling */
+        /* Dynamic theme updates for containers */
         .sidebar-logo {{
-            text-align: center;
-            margin-bottom: 1.5rem;
-            padding: 1rem 0;
-            border-bottom: 1px solid {theme["BORDER"]};
+            border-bottom: 1px solid {theme["BORDER"]} !important;
         }}
 
-        .sidebar-logo .logo-container {{
-            justify-content: center;
+        .auth-logo-container {{
+            background: {theme["CARD"]} !important;
+            box-shadow: {theme["SHADOW"]} !important;
         }}
     </style>
     """, unsafe_allow_html=True)
@@ -379,17 +377,20 @@ def main():
         st.session_state.selected_menu = list(menu.keys())[0]
 
     with st.sidebar:
-        # Render sidebar logo using shared component
-        st.markdown('<div class="sidebar-logo">', unsafe_allow_html=True)
+        # Render sidebar logo using shared component with container
         st.markdown(
-            render_logo_html(size="small", show_tagline=False),
+            render_logo_html(
+                size="small", 
+                show_tagline=False,
+                container_class="sidebar-logo"
+            ),
             unsafe_allow_html=True
         )
+        
         st.markdown(
-            f'<h3 style="margin: 0.5rem 0 0 0; color: {theme["TEXT"]}; font-weight: 600;">SaaS Billing</h3>',
+            f'<h3 style="margin: 0.5rem 0 0 0; color: {theme["TEXT"]}; font-weight: 600; text-align: center;">SaaS Billing</h3>',
             unsafe_allow_html=True
         )
-        st.markdown('</div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns([1, 1])
         with col1:
