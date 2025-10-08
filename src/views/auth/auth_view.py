@@ -29,16 +29,16 @@ except ImportError:
     recaptcha = None
     logger.warning("reCAPTCHA component not available")
 
-def get_logo_base64():
-    # Replace with your actual logo path or base64 encoded string
-    logo_path = "assets/logo.png"  # Placeholder
-    try:
-        with open(logo_path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-    except:
-        return None
+# Import shared logo CSS
+try:
+    from utils.logo_css import get_logo_css, render_logo_html
+except ImportError:
+    logger.warning("Logo CSS module not available, using fallback")
 
 def apply_auth_theme(theme):
+    # Apply shared logo CSS
+    st.markdown(get_logo_css(), unsafe_allow_html=True)
+    
     st.markdown(f"""
     <style>
         .auth-container {{
@@ -127,6 +127,20 @@ def apply_auth_theme(theme):
             transform: scale(0.85);
             transform-origin: 0 0;
         }}
+
+        /* Auth page specific logo styling */
+        .auth-logo-container {{
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: {theme["CARD"]};
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(128, 0, 32, 0.1);
+        }}
+
+        .auth-logo-container .logo-container {{
+            justify-content: center;
+        }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -154,25 +168,19 @@ def auth_view():
     theme = DARK_THEME if dark_mode else LIGHT_THEME
     apply_auth_theme(theme)
     
-    # Logo
-    logo_base64 = get_logo_base64()
-    
     # Main container with animation
     st.markdown('<div class="auth-transition">', unsafe_allow_html=True)
     
     # Center the auth form
     col1, col2, col3 = st.columns([1, 3, 1])
     with col2:
-        if logo_base64:
-            st.markdown(
-                f'<div style="text-align: center; margin-bottom: 2rem;">'
-                f'<img src="data:image/png;base64,{logo_base64}" style="max-width: 200px;">'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        
-        st.markdown(f'<h1 style="text-align: center; color: {theme["TEXT"]};">🔐 SglTrack SaaS Billing Platform</h1>', 
-                   unsafe_allow_html=True)
+        # Render logo using shared component
+        st.markdown(
+            f'<div class="auth-logo-container">'
+            f'{render_logo_html(size="hero", show_tagline=True, tagline_text="ENTERPRISE SAAS BILLING")}'
+            f'</div>',
+            unsafe_allow_html=True
+        )
         
         tabs = st.tabs(["Login", "Register"])
         
@@ -298,6 +306,7 @@ def auth_view():
                             process_registration(reg_username, reg_password, reg_email, first_name, last_name, reg_company, reg_tenant_id)
     
     st.markdown('</div>', unsafe_allow_html=True)
+# --- registration processing ---
 
 def process_registration(username, password, email, first_name, last_name, company, tenant_id):
     """Process user registration"""
