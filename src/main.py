@@ -157,14 +157,11 @@ def handle_token_verification(token: str):
     
     # Render logo using shared component
     st.markdown(
-        f'<div style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: {theme["CARD"]}; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">',
+        f'<div style="text-align: center; margin-bottom: 2rem; padding: 2rem; background: {theme["CARD"]}; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">'
+        f'{render_logo_html(size="hero", show_tagline=True, tagline_text="EMAIL VERIFICATION")}'
+        f'</div>',
         unsafe_allow_html=True
     )
-    st.markdown(
-        render_logo_html(size="hero", show_tagline=True, tagline_text="EMAIL VERIFICATION"),
-        unsafe_allow_html=True
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
     
     if result.get("success"):
         # Success layout
@@ -380,16 +377,13 @@ def main():
 
     with st.sidebar:
         # Render sidebar logo using shared component
-        st.markdown('<div class="sidebar-logo">', unsafe_allow_html=True)
         st.markdown(
-            render_logo_html(size="small", show_tagline=False),
+            f'<div class="sidebar-logo">'
+            f'{render_logo_html(size="small", show_tagline=False)}'
+            f'<h3 style="margin: 0.5rem 0 0 0; color: {theme["TEXT"]}; font-weight: 600;">SaaS Billing</h3>'
+            f'</div>', 
             unsafe_allow_html=True
         )
-        st.markdown(
-            f'<h3 style="margin: 0.5rem 0 0 0; color: {theme["TEXT"]}; font-weight: 600;">SaaS Billing</h3>',
-            unsafe_allow_html=True
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns([1, 1])
         with col1:
