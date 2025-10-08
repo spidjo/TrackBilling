@@ -59,11 +59,13 @@ DARK_THEME = {
 
 # --- Import shared logo CSS ---
 try:
-    from utils.logo_css import get_logo_css, render_logo_html
+    from utils.logo_css import get_logo_css, render_logo_html, render_logo_with_container
 except ImportError:
     def get_logo_css():
         return ""
     def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False, container_class=""):
+        return f"<div>SglTrack {tagline_text}</div>"
+    def render_logo_with_container(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False, container_class=""):
         return f"<div>SglTrack {tagline_text}</div>"
 
 # --- Lazy Imports ---
@@ -155,9 +157,9 @@ def handle_token_verification(token: str):
     theme = DARK_THEME if st.session_state.get("dark_mode", False) else LIGHT_THEME
     apply_theme(theme)
     
-    # Render logo using shared component with container
+    # Render logo using simplified container approach
     st.markdown(
-        render_logo_html(
+        render_logo_with_container(
             size="hero", 
             show_tagline=True, 
             tagline_text="EMAIL VERIFICATION",
@@ -377,9 +379,9 @@ def main():
         st.session_state.selected_menu = list(menu.keys())[0]
 
     with st.sidebar:
-        # Render sidebar logo using shared component with container
+        # Render sidebar logo using simplified container approach
         st.markdown(
-            render_logo_html(
+            render_logo_with_container(
                 size="small", 
                 show_tagline=False,
                 container_class="sidebar-logo"

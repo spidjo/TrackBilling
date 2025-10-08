@@ -8,7 +8,7 @@ def get_logo_css():
     return """
     <style>
         /* SglTrack Logo Styles */
-        .logo-container {
+        .logo-wrapper {
             display: flex;
             align-items: center;
             gap: 12px;
@@ -16,7 +16,7 @@ def get_logo_css():
             transition: transform 0.3s ease;
         }
 
-        .logo-container:hover {
+        .logo-wrapper:hover {
             transform: translateY(-2px);
         }
 
@@ -31,6 +31,7 @@ def get_logo_css():
             position: relative;
             overflow: hidden;
             box-shadow: 0 4px 15px rgba(128, 0, 32, 0.2);
+            flex-shrink: 0;
         }
 
         .logo-icon::before {
@@ -68,6 +69,11 @@ def get_logo_css():
             border-radius: 2px;
         }
 
+        .logo-content {
+            display: flex;
+            flex-direction: column;
+        }
+
         .logo-text {
             font-family: 'Inter', sans-serif;
             font-weight: 700;
@@ -77,6 +83,7 @@ def get_logo_css():
             -webkit-text-fill-color: transparent;
             background-clip: text;
             line-height: 1;
+            margin: 0;
         }
 
         .logo-tagline {
@@ -85,6 +92,7 @@ def get_logo_css():
             margin-top: 2px;
             letter-spacing: 1px;
             font-weight: 500;
+            margin: 0;
         }
 
         /* Responsive Logo */
@@ -151,7 +159,7 @@ def get_logo_css():
             color: rgba(255, 255, 255, 0.8);
         }
 
-        /* Sidebar logo styling */
+        /* Container Styles */
         .sidebar-logo {
             text-align: center;
             margin-bottom: 1.5rem;
@@ -159,11 +167,10 @@ def get_logo_css():
             border-bottom: 1px solid #e5e7eb;
         }
 
-        .sidebar-logo .logo-container {
+        .sidebar-logo .logo-wrapper {
             justify-content: center;
         }
 
-        /* Auth logo styling */
         .auth-logo-container {
             text-align: center;
             margin-bottom: 2rem;
@@ -173,31 +180,37 @@ def get_logo_css():
             box-shadow: 0 8px 32px rgba(0,0,0,0.1);
         }
 
-        .auth-logo-container .logo-container {
+        .auth-logo-container .logo-wrapper {
             justify-content: center;
         }
     </style>
     """
 
 def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False, container_class=""):
-    """Render logo HTML with specified size and options"""
+    """Render logo HTML with specified size and options - SIMPLIFIED VERSION"""
     size_class = f"logo-{size}" if size != "normal" else ""
     color_class = "logo-white" if white_text else ""
     
-    logo_html = f"""
-    <div class="logo-container {size_class} {color_class}">
+    # Single div structure to avoid nested div issues
+    logo_html = f'''
+    <div class="logo-wrapper {size_class} {color_class}">
         <div class="logo-icon">
             <div class="logo-icon-inner"></div>
         </div>
-        <div>
+        <div class="logo-content">
             <div class="logo-text">SglTrack</div>
             {f'<div class="logo-tagline">{tagline_text}</div>' if show_tagline else ''}
         </div>
     </div>
-    """
+    '''
     
-    # Wrap in container if specified
+    return logo_html
+
+def render_logo_with_container(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False, container_class=""):
+    """Render logo with optional container wrapper"""
+    logo_html = render_logo_html(size, show_tagline, tagline_text, white_text)
+    
     if container_class:
-        logo_html = f'<div class="{container_class}">{logo_html}</div>'
+        return f'<div class="{container_class}">{logo_html}</div>'
     
     return logo_html
