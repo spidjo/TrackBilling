@@ -389,10 +389,10 @@ def main():
             unsafe_allow_html=True
         )
         
-        st.markdown(
-            f'<h3 style="margin: 0.5rem 0 0 0; color: {theme["TEXT"]}; font-weight: 600; text-align: center;">SaaS Billing</h3>',
-            unsafe_allow_html=True
-        )
+        # st.markdown(
+        #     f'<h3 style="margin: 0.5rem 0 0 0; color: {theme["TEXT"]}; font-weight: 600; text-align: center;">SaaS Billing</h3>',
+        #     unsafe_allow_html=True
+        # )
         
         col1, col2 = st.columns([1, 1])
         with col1:
