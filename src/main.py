@@ -383,7 +383,7 @@ def main():
         st.markdown(
             render_logo_with_container(
                 size="small", 
-                show_tagline=False,
+                show_tagline=True,
                 container_class="sidebar-logo"
             ),
             unsafe_allow_html=True
