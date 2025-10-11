@@ -206,7 +206,7 @@ def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLIN
     
     return logo_html
 
-def render_logo_with_container(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False, container_class=False):
+def render_logo_with_container(size="normal", show_tagline=True, tagline_text="SAAS BILLING", white_text=False, container_class=""):
     """Render logo with optional container wrapper"""
     logo_html = render_logo_html(size, show_tagline, tagline_text, white_text)
     
