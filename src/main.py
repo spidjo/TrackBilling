@@ -390,7 +390,7 @@ def main():
         )
         
         st.markdown(
-            f'<h3 style="margin: 0.5rem 0 0 0; color: {theme["TEXT"]}; font-weight: 600; text-align: center;">SaaS Billing!</h3>',
+            f'<h3 style="margin: 0.5rem 0 0 0; color: {theme["TEXT"]}; font-weight: 600; text-align: center;">SaaS Billing</h3>',
             unsafe_allow_html=True
         )
         

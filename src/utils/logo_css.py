@@ -199,8 +199,8 @@ def render_logo_html(size="normal", show_tagline=True, tagline_text="SAAS BILLIN
         </div>
         <div class="logo-content">
             <div class="logo-text">SglTrack</div>
-            {f'<div class="logo-tagline">{tagline_text}</div>' if show_tagline else ''}
-        </div>
+            {f'<div class="logo-tagline">{tagline_text}' if show_tagline else ''}
+        
     </div>
     '''
     
