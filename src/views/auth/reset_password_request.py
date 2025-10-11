@@ -1,7 +1,7 @@
 # src/views/auth/reset_password_request.py
 import streamlit as st
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from db.database import get_db_connection
 from utils.email_utils import send_password_reset_email
 from utils.ui_helpers import show_toast, loading_spinner
@@ -44,7 +44,7 @@ def handle_reset_request(email):
         
         # Generate new token and expiry (1 hour validity)
         token = secrets.token_urlsafe(32)
-        expires_at = datetime.now(tz=timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
         
         # Insert new password reset token
         cursor.execute("""
