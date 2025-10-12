@@ -16,8 +16,8 @@ def reset_password_request():
         if st.form_submit_button("Send Reset Link"):
             handle_reset_request(email)
 
-def handle_reset_request(email):
-    email = email.strip().lower()
+def handle_reset_request(email: str) -> None:
+    email: str = email.strip().lower()
     if not email:
         show_toast("Please enter your email", "error")
         return
@@ -30,7 +30,7 @@ def handle_reset_request(email):
         # Check if user exists
         cursor.execute("""
             SELECT id, username FROM users WHERE email = %s
-        """, (email,))
+        """, (str(email),))
         user = cursor.fetchone()
         
         if not user:
@@ -40,26 +40,26 @@ def handle_reset_request(email):
         user_id, username = user
         
         # Remove existing password reset tokens for this user (clean slate)
-        cursor.execute("DELETE FROM password_resets WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM password_resets WHERE user_id = %s", (int(user_id),))
         
         # Generate new token and expiry (1 hour validity)
-        token = secrets.token_urlsafe(32)
-        expires_at = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+        token: str = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
         
         # Insert new password reset token
         cursor.execute("""
             INSERT INTO password_resets (user_id, token, expires_at)
             VALUES (%s, %s, %s)
-        """, (user_id, token, expires_at))
+        """, (int(user_id), str(token), expires_at))
         
         conn.commit()
         
         # Send reset email
         with loading_spinner("Sending reset email..."):
             send_password_reset_email(
-                to_email=email,
-                username=username,
-                token=token
+                to_email=str(email),
+                username=str(username),
+                token=str(token)
             )
         
         st.success("✅ Password reset link sent. Please check your email.")
