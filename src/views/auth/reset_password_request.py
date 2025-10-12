@@ -40,15 +40,14 @@ def handle_reset_request(email):
         # Remove existing tokens
         cursor.execute("DELETE FROM password_resets WHERE user_id = %s", (user_id,))
         
-        # Generate token and expiry - using naive datetime (no timezone)
+        # Generate token
         token = secrets.token_urlsafe(32)
-        expires_at = datetime.now() + timedelta(hours=1)
         
-        # Insert new token
+        # Let the database handle the timestamp using its own NOW() function
         cursor.execute("""
             INSERT INTO password_resets (user_id, token, expires_at)
-            VALUES (%s, %s, %s)
-        """, (user_id, token, expires_at))
+            VALUES (%s, %s, NOW() + INTERVAL '1 HOUR')
+        """, (user_id, token))
         
         conn.commit()
         
