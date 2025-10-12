@@ -44,12 +44,12 @@ def handle_reset_request(email):
         token = secrets.token_urlsafe(32)
         
         # Let the database handle the timestamp using its own NOW() function
-        cursor.execute("""
-            INSERT INTO password_resets (user_id, token, expires_at)
-            VALUES (%s, %s, NOW() + INTERVAL '1 HOUR')
-        """, (user_id, token))
+        # cursor.execute("""
+        #     INSERT INTO password_resets (user_id, token, expires_at)
+        #     VALUES (%s, %s, NOW() + INTERVAL '1 HOUR')
+        # """, (user_id, token))
         
-        conn.commit()
+        # conn.commit()
         
         # Send email
         with loading_spinner("Sending reset email..."):
