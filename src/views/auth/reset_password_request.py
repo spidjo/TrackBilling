@@ -10,7 +10,7 @@ def reset_password_request():
     st.title("🔑 Password Recovery")
     
     with st.form("reset_request_form"):
-        st.markdown("Enter your email address to receive a password reset link")
+        st.markdown("Enter your email address to receive a password reset link!")
         email = st.text_input("Email Address", placeholder="your@email.com")
         
         if st.form_submit_button("Send Reset Link"):
@@ -44,7 +44,7 @@ def handle_reset_request(email):
         
         # Generate new token and expiry (1 hour validity)
         token = secrets.token_urlsafe(32)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
         
         # Insert new password reset token
         cursor.execute("""
