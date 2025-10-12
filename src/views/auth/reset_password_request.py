@@ -44,7 +44,7 @@ def handle_reset_request(email: str) -> None:
         
         # Generate new token and expiry (1 hour validity)
         token: str = secrets.token_urlsafe(32)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         
         # Insert new password reset token
         cursor.execute("""
