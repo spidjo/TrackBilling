@@ -1,7 +1,7 @@
 # src/views/auth/reset_password_request.py
 import streamlit as st
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from db.database import get_db_connection
 from utils.email_utils import send_password_reset_email
 from utils.ui_helpers import show_toast, loading_spinner
@@ -40,36 +40,27 @@ def handle_reset_request(email):
         # Remove existing tokens
         cursor.execute("DELETE FROM password_resets WHERE user_id = %s", (user_id,))
         
-        # Generate token and expiry
+        # Generate token and expiry - using naive datetime (no timezone)
         token = secrets.token_urlsafe(32)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires_at = datetime.now() + timedelta(hours=1)
         
-        # Debug: Print the values before insertion
-        st.write(f"Debug - User ID: {user_id}, Token: {token}, Expires At: {expires_at}")
-        st.write(f"Debug - Expires At type: {type(expires_at)}")
+        # Insert new token
+        cursor.execute("""
+            INSERT INTO password_resets (user_id, token, expires_at)
+            VALUES (%s, %s, %s)
+        """, (user_id, token, expires_at))
         
-        try:
-            # Insert new token
-            cursor.execute("""
-                INSERT INTO password_resets (user_id, token, expires_at)
-                VALUES (%s, %s, %s)
-            """, (user_id, token, expires_at))
-            
-            conn.commit()
-            
-            # Send email
-            with loading_spinner("Sending reset email..."):
-                send_password_reset_email(
-                    to_email=email,
-                    username=username,
-                    token=token
-                )
-            
-            st.success("✅ Password reset link sent. Please check your email.")
-            
-        except Exception as insert_error:
-            st.error(f"Database insertion error: {str(insert_error)}")
-            conn.rollback()
+        conn.commit()
+        
+        # Send email
+        with loading_spinner("Sending reset email..."):
+            send_password_reset_email(
+                to_email=email,
+                username=username,
+                token=token
+            )
+        
+        st.success("✅ Password reset link sent. Please check your email.")
     
     except Exception as e:
         if conn:
