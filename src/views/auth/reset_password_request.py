@@ -28,9 +28,7 @@ def handle_reset_request(email):
         cursor = conn.cursor()
         
         # Check if user exists
-        cursor.execute("""
-            SELECT id, username FROM users WHERE email = %s
-        """, (email,))
+        cursor.execute("SELECT id, username FROM users WHERE email = %s", (email,))
         user = cursor.fetchone()
         
         if not user:
@@ -39,33 +37,39 @@ def handle_reset_request(email):
         
         user_id, username = user
         
-        # Remove existing password reset tokens for this user (clean slate)
+        # Remove existing tokens
         cursor.execute("DELETE FROM password_resets WHERE user_id = %s", (user_id,))
         
-        # Generate new token and expiry (1 hour validity)
+        # Generate token and expiry
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
         
-        # Format the datetime as string for database insertion
-        expires_at_str = expires_at.strftime('%Y-%m-%d %H:%M:%S')
+        # Debug: Print the values before insertion
+        st.write(f"Debug - User ID: {user_id}, Token: {token}, Expires At: {expires_at}")
+        st.write(f"Debug - Expires At type: {type(expires_at)}")
         
-        # Insert new password reset token
-        cursor.execute("""
-            INSERT INTO password_resets (user_id, token, expires_at)
-            VALUES (%s, %s, %s)
-        """, (user_id, token, expires_at_str))
-        
-        conn.commit()
-        
-        # Send reset email
-        with loading_spinner("Sending reset email..."):
-            send_password_reset_email(
-                to_email=email,
-                username=username,
-                token=token
-            )
-        
-        st.success("✅ Password reset link sent. Please check your email.")
+        try:
+            # Insert new token
+            cursor.execute("""
+                INSERT INTO password_resets (user_id, token, expires_at)
+                VALUES (%s, %s, %s)
+            """, (user_id, token, expires_at))
+            
+            conn.commit()
+            
+            # Send email
+            with loading_spinner("Sending reset email..."):
+                send_password_reset_email(
+                    to_email=email,
+                    username=username,
+                    token=token
+                )
+            
+            st.success("✅ Password reset link sent. Please check your email.")
+            
+        except Exception as insert_error:
+            st.error(f"Database insertion error: {str(insert_error)}")
+            conn.rollback()
     
     except Exception as e:
         if conn:
