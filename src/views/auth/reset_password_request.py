@@ -42,14 +42,14 @@ def handle_reset_request(email):
         
         # Generate token
         token = secrets.token_urlsafe(32)
+
+        # Insert token with expiry (1 hour from now) using PostgreSQL's NOW() + INTERVAL
+        cursor.execute("""
+            INSERT INTO password_resets (user_id, token, expires_at)
+            VALUES (%s, %s, NOW() + INTERVAL '1 hour')
+        """, (user_id, token))
         
-        # Let the database handle the timestamp using its own NOW() function
-        # cursor.execute("""
-        #     INSERT INTO password_resets (user_id, token, expires_at)
-        #     VALUES (%s, %s, NOW() + INTERVAL '1 HOUR')
-        # """, (user_id, token))
-        
-        # conn.commit()
+        conn.commit()
         
         # Send email
         with loading_spinner("Sending reset email..."):

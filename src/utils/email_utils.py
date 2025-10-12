@@ -33,7 +33,7 @@ def render_email_template(template_name, **context):
     template = templates_env.get_template(template_name)
     return template.render(
         **context,
-        year=datetime.now().year,
+        year=datetime.now().year,  # This should work fine
         app_url=APP_URL,
         app_name=APP_NAME
     )
