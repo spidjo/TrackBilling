@@ -264,7 +264,7 @@ class SimpleTenantManager:
                     INSERT INTO users 
                     (tenant_id, first_name, last_name, username, password, email, role, is_active, 
                      is_verified, registration_date, company_name)
-                    VALUES (%s, %s, %s, %s, %s, %s, 'admin', TRUE, TRUE, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, 'admin', 1, TRUE, %s, %s)
                     RETURNING id
                 """, (
                     tenant_id, admin_data['first_name'].strip(), admin_data['last_name'].strip(),
