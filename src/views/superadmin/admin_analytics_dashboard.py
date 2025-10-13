@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -681,23 +682,32 @@ def render_admin_analytics_dashboard():
             df_clv = pd.DataFrame(clv_data, columns=["tenant_id", "tenant_name", "avg_revenue", "users", "avg_duration"])
             # Convert interval to number of days
             if not df_clv.empty:
-                # Convert interval to number of days - handle different possible formats
-                if isinstance(df_clv["avg_duration"].iloc[0], str):
-                    # If it's a string like "30 days"
-                    df_clv["avg_duration_days"] = df_clv["avg_duration"].str.extract('(\d+)').astype(float)
-                elif isinstance(df_clv["avg_duration"].iloc[0], pd.Timedelta):
-                    # If it's already a pandas Timedelta
-                    df_clv["avg_duration_days"] = df_clv["avg_duration"].dt.days
-                else:
-                    # If it's in days already (from the database)
-                    df_clv["avg_duration_days"] = df_clv["avg_duration"].astype(float)
+                # Convert interval to number of days - handle different possible formats and None values
+                def safe_convert_duration(duration_val):
+                    if duration_val is None:
+                        return 0.0
+                    try:
+                        if isinstance(duration_val, str):
+                            # If it's a string like "30 days"
+                            match = re.search(r'(\d+)', str(duration_val))
+                            return float(match.group(1)) if match else 0.0
+                        elif isinstance(duration_val, pd.Timedelta):
+                            # If it's already a pandas Timedelta
+                            return duration_val.days
+                        else:
+                            # If it's in days already (from the database)
+                            return float(duration_val)
+                    except Exception:
+                        return 0.0
+                
+                df_clv["avg_duration_days"] = df_clv["avg_duration"].apply(safe_convert_duration)
                 
                 # Convert avg_revenue from Decimal to float if needed
                 if isinstance(df_clv["avg_revenue"].iloc[0], Decimal):
                     df_clv["avg_revenue"] = df_clv["avg_revenue"].astype(float)
                 
                 # Calculate CLV with all values as float
-                df_clv["clv"] = df_clv["avg_revenue"] * (df_clv["avg_duration_days"].astype(float) / 30.0)  # Simple CLV calculation
+                df_clv["clv"] = df_clv["avg_revenue"] * (df_clv["avg_duration_days"] / 30.0)
 
             fig = px.bar(
                 df_clv,
@@ -1031,15 +1041,28 @@ def render_admin_analytics_dashboard():
             if inactive_clients:
                 df_inactive = pd.DataFrame(inactive_clients, columns=["Username", "Tenant", "Last Login"])
                 
-                # Format last login
-                df_inactive["Days Inactive"] = (datetime.now() - df_inactive["Last Login"]).dt.days
+                # FIX: Handle None values in Last Login and calculate days inactive safely
+                current_time = datetime.now()
+                
+                def calculate_days_inactive(last_login):
+                    if last_login is None:
+                        return 999  # Or some high number to indicate very inactive
+                    try:
+                        # Ensure both are timezone-naive or both are timezone-aware
+                        if isinstance(last_login, pd.Timestamp):
+                            last_login = last_login.to_pydatetime()
+                        return (current_time - last_login).days
+                    except Exception as e:
+                        return 999  # Fallback for any calculation errors
+                
+                df_inactive["Days Inactive"] = df_inactive["Last Login"].apply(calculate_days_inactive)
                 df_inactive = df_inactive.drop(columns=["Last Login"])
                 
                 st.dataframe(
                     df_inactive.style
                     .apply(lambda x: ['background-color: #FEF3C7' if v >= 60 else 
-                                     'background-color: #FEE2E2' if v >= 90 else 
-                                     '' for v in x], subset=["Days Inactive"]),
+                                    'background-color: #FEE2E2' if v >= 90 else 
+                                    '' for v in x], subset=["Days Inactive"]),
                     use_container_width=True,
                     height=300
                 )
