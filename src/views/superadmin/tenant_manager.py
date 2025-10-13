@@ -1,4 +1,4 @@
-# tenant_manager.py - Fixed metric key issue
+# tenant_manager.py - Fixed session state and navigation issues
 import streamlit as st
 from db.database import get_db_connection
 from utils.session_guard import require_login
@@ -82,7 +82,7 @@ class TenantManager:
             'new_tenant_id': None,
             'edit_tenant_id': None,
             'view_tenant_id': None,
-            'current_tab': 'manage'
+            'active_tab': 'dashboard'  # Changed from 'current_tab' to 'active_tab'
         }
         
         for key, value in defaults.items():
@@ -621,10 +621,12 @@ class TenantManager:
                     with btn_col1:
                         if st.button("👁️", key=f"view_tenant_{tenant_id}", help="View Details", use_container_width=True):
                             st.session_state.view_tenant_id = tenant_id
+                            st.session_state.active_tab = 'management'  # Stay on management tab
                             st.rerun()
                     with btn_col2:
                         if st.button("✏️", key=f"edit_tenant_{tenant_id}", help="Edit Tenant", use_container_width=True):
                             st.session_state.edit_tenant_id = tenant_id
+                            st.session_state.active_tab = 'management'  # Stay on management tab
                             st.rerun()
                     with btn_col3:
                         if is_active:
@@ -738,11 +740,15 @@ class TenantManager:
         with quick_col1:
             if st.button("➕ Create New Tenant", use_container_width=True, key="quick_create_tenant"):
                 st.session_state.edit_tenant_id = None
+                st.session_state.active_tab = 'management'  # Switch to management tab
                 st.rerun()
         
         with quick_col2:
             if st.button("📊 View All Tenants", use_container_width=True, key="quick_view_tenants"):
-                st.session_state.current_tab = 'manage'
+                st.session_state.active_tab = 'management'  # Switch to management tab
+                st.session_state.view_tenant_id = None
+                st.session_state.edit_tenant_id = None
+                st.session_state.show_admin_form = False
                 st.rerun()
         
         with quick_col3:
@@ -762,38 +768,47 @@ class TenantManager:
         st.title("🏢 Tenant Management")
         st.markdown("Comprehensive tenant account management and configuration")
         
-        # Tab navigation
+        # Tab navigation - use session state to control active tab
         tab1, tab2 = st.tabs(["📊 Dashboard", "👥 Tenant Management"])
         
-        with tab1:
-            self.render_dashboard()
+        # Determine which tab to show based on session state
+        if st.session_state.active_tab == 'dashboard':
+            with tab1:
+                self.render_dashboard()
+            with tab2:
+                # Just render empty or basic content for the other tab
+                st.info("Switch to the Dashboard tab to view tenant management dashboard.")
         
-        with tab2:
-            # Handle different view states
-            if st.session_state.show_admin_form and st.session_state.new_tenant_id:
-                self.render_admin_creation_form()
-            
-            elif st.session_state.edit_tenant_id:
-                tenant_details = self.load_tenant_details(st.session_state.edit_tenant_id)
-                if tenant_details:
-                    self.render_tenant_form(tenant_details)
-                else:
-                    st.error("Tenant not found")
-                    st.session_state.edit_tenant_id = None
-            
-            elif st.session_state.view_tenant_id:
-                self.render_tenant_detail_view(st.session_state.view_tenant_id)
-            
-            else:
-                # Main management view
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown("### Tenant Management")
-                with col2:
-                    if st.button("➕ Create New Tenant", use_container_width=True, key="main_create_tenant"):
-                        st.session_state.edit_tenant_id = None  # Ensure we're in create mode
+        else:  # management tab
+            with tab1:
+                # Just render empty or basic content for the other tab
+                st.info("Switch to the Tenant Management tab to manage tenants.")
+            with tab2:
+                # Handle different view states in the management tab
+                if st.session_state.show_admin_form and st.session_state.new_tenant_id:
+                    self.render_admin_creation_form()
                 
-                self.render_tenant_list()
+                elif st.session_state.edit_tenant_id:
+                    tenant_details = self.load_tenant_details(st.session_state.edit_tenant_id)
+                    if tenant_details:
+                        self.render_tenant_form(tenant_details)
+                    else:
+                        st.error("Tenant not found")
+                        st.session_state.edit_tenant_id = None
+                
+                elif st.session_state.view_tenant_id:
+                    self.render_tenant_detail_view(st.session_state.view_tenant_id)
+                
+                else:
+                    # Main management view
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.markdown("### Tenant Management")
+                    with col2:
+                        if st.button("➕ Create New Tenant", use_container_width=True, key="main_create_tenant"):
+                            st.session_state.edit_tenant_id = None  # Ensure we're in create mode
+                    
+                    self.render_tenant_list()
 
 def tenant_manager():
     """Main entry point for the tenant manager"""
