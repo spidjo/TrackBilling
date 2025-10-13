@@ -1,4 +1,4 @@
-# tenant_manager.py - Tenant Management View for Super Admins
+# tenant_manager.py - Fixed metric key issue
 import streamlit as st
 from db.database import get_db_connection
 from utils.session_guard import require_login
@@ -407,7 +407,8 @@ class TenantManager:
                     "Tenant Name *",
                     value=tenant_data.get('name', '') if tenant_data else '',
                     placeholder="Enter tenant organization name",
-                    help="Official name of the tenant organization"
+                    help="Official name of the tenant organization",
+                    key=f"tenant_name_{'edit' if is_edit else 'new'}"
                 )
                 
                 industry = st.selectbox(
@@ -415,7 +416,8 @@ class TenantManager:
                     self.INDUSTRY_OPTIONS,
                     index=self.INDUSTRY_OPTIONS.index(tenant_data.get('industry', '')) 
                     if tenant_data and tenant_data.get('industry') in self.INDUSTRY_OPTIONS else 0,
-                    help="Select the primary industry for this tenant"
+                    help="Select the primary industry for this tenant",
+                    key=f"tenant_industry_{'edit' if is_edit else 'new'}"
                 )
             
             with col2:
@@ -423,21 +425,24 @@ class TenantManager:
                     "Company Legal Name",
                     value=tenant_data.get('company_name', '') if tenant_data else '',
                     placeholder="Enter legal company name (optional)",
-                    help="Legal company name for contracts and billing"
+                    help="Legal company name for contracts and billing",
+                    key=f"company_name_{'edit' if is_edit else 'new'}"
                 )
                 
                 contact_email = st.text_input(
                     "Contact Email",
                     value=tenant_data.get('email', '') if tenant_data else '',
                     placeholder="primary@company.com",
-                    help="Primary contact email for administrative communications"
+                    help="Primary contact email for administrative communications",
+                    key=f"contact_email_{'edit' if is_edit else 'new'}"
                 )
             
             phone = st.text_input(
                 "Phone Number",
                 value=tenant_data.get('phone', '') if tenant_data else '',
                 placeholder="+1 (555) 123-4567",
-                help="Primary contact phone number (optional)"
+                help="Primary contact phone number (optional)",
+                key=f"phone_{'edit' if is_edit else 'new'}"
             )
             
             submitted = st.form_submit_button(
@@ -718,13 +723,13 @@ class TenantManager:
         total_subs = sum(t[10] for t in tenants)  # total_active_subs field
         
         with col1:
-            st.metric("Total Tenants", total_tenants, key="metric_total_tenants")
+            st.metric("Total Tenants", total_tenants)
         with col2:
-            st.metric("Active Tenants", active_tenants, key="metric_active_tenants")
+            st.metric("Active Tenants", active_tenants)
         with col3:
-            st.metric("Total Users", total_users, key="metric_total_users")
+            st.metric("Total Users", total_users)
         with col4:
-            st.metric("Active Subscriptions", total_subs, key="metric_active_subs")
+            st.metric("Active Subscriptions", total_subs)
         
         # Quick actions
         st.markdown("#### Quick Actions")
