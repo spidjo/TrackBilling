@@ -82,7 +82,8 @@ class TenantManager:
             'new_tenant_id': None,
             'edit_tenant_id': None,
             'view_tenant_id': None,
-            'active_tab': 'dashboard'  # Changed from 'current_tab' to 'active_tab'
+            'active_tab': 'dashboard',
+            'management_view': 'list'  # 'list', 'create', 'edit', 'view', 'admin'
         }
         
         for key, value in defaults.items():
@@ -397,6 +398,12 @@ class TenantManager:
         """Render the tenant creation/editing form"""
         is_edit = tenant_data is not None
         
+        # Back button
+        if st.button("← Back to List", key="back_from_form"):
+            st.session_state.management_view = 'list'
+            st.session_state.edit_tenant_id = None
+            st.rerun()
+        
         with st.form(f"tenant_form_{'edit' if is_edit else 'new'}", clear_on_submit=not is_edit):
             st.markdown(f"### {'Edit' if is_edit else 'Create New'} Tenant")
             
@@ -465,6 +472,7 @@ class TenantManager:
                     success, message = self.update_tenant(tenant_data['id'], form_data)
                     if success:
                         st.toast(message, icon="✅")
+                        st.session_state.management_view = 'list'
                         st.session_state.edit_tenant_id = None
                         st.rerun()
                     else:
@@ -474,7 +482,7 @@ class TenantManager:
                     if success:
                         st.toast(message, icon="✅")
                         st.session_state.new_tenant_id = tenant_id
-                        st.session_state.show_admin_form = True
+                        st.session_state.management_view = 'admin'
                         st.rerun()
                     else:
                         st.error(message)
@@ -483,12 +491,22 @@ class TenantManager:
         """Render the admin user creation form"""
         tenant_id = st.session_state.new_tenant_id
         if not tenant_id:
+            st.session_state.management_view = 'list'
+            st.rerun()
             return
         
         tenant_details = self.load_tenant_details(tenant_id)
         if not tenant_details:
             st.error("Tenant not found")
+            st.session_state.management_view = 'list'
+            st.rerun()
             return
+        
+        # Back button
+        if st.button("← Back", key="back_from_admin_form"):
+            st.session_state.management_view = 'list'
+            st.session_state.new_tenant_id = None
+            st.rerun()
         
         st.markdown("### Create Tenant Administrator")
         
@@ -551,14 +569,14 @@ class TenantManager:
                     else:
                         st.warning("Admin created but invitation email failed to send. Please manually send the password reset link.")
                     
-                    st.session_state.show_admin_form = False
+                    st.session_state.management_view = 'list'
                     st.session_state.new_tenant_id = None
                     st.rerun()
                 else:
                     st.error(message)
             
             if skip_submitted:
-                st.session_state.show_admin_form = False
+                st.session_state.management_view = 'list'
                 st.session_state.new_tenant_id = None
                 st.toast("Tenant created without admin. You can add admins later.", icon="ℹ️")
                 st.rerun()
@@ -567,15 +585,17 @@ class TenantManager:
         """Render the tenant directory with enhanced features"""
         st.markdown("### Tenant Directory")
         
+        # Create new tenant button
+        if st.button("➕ Create New Tenant", use_container_width=True, key="create_new_tenant_main"):
+            st.session_state.management_view = 'create'
+            st.rerun()
+        
         # Filters
-        col1, col2, col3 = st.columns([2, 2, 1])
+        col1, col2 = st.columns([2, 2])
         with col1:
             show_inactive = st.checkbox("Show Inactive Tenants", value=False, key="show_inactive_tenants")
         with col2:
             search_term = st.text_input("Search tenants", placeholder="Search by name or industry...", key="tenant_search")
-        with col3:
-            if st.button("Refresh", use_container_width=True, key="refresh_tenants"):
-                st.rerun()
         
         tenants = self.load_tenants(include_inactive=show_inactive)
         
@@ -621,12 +641,12 @@ class TenantManager:
                     with btn_col1:
                         if st.button("👁️", key=f"view_tenant_{tenant_id}", help="View Details", use_container_width=True):
                             st.session_state.view_tenant_id = tenant_id
-                            st.session_state.active_tab = 'management'  # Stay on management tab
+                            st.session_state.management_view = 'view'
                             st.rerun()
                     with btn_col2:
                         if st.button("✏️", key=f"edit_tenant_{tenant_id}", help="Edit Tenant", use_container_width=True):
                             st.session_state.edit_tenant_id = tenant_id
-                            st.session_state.active_tab = 'management'  # Stay on management tab
+                            st.session_state.management_view = 'edit'
                             st.rerun()
                     with btn_col3:
                         if is_active:
@@ -653,17 +673,17 @@ class TenantManager:
         tenant_details = self.load_tenant_details(tenant_id)
         if not tenant_details:
             st.error("Tenant not found")
+            st.session_state.management_view = 'list'
+            st.rerun()
             return
         
-        st.markdown("### Tenant Details")
+        # Back button
+        if st.button("← Back to List", key="back_from_details"):
+            st.session_state.management_view = 'list'
+            st.session_state.view_tenant_id = None
+            st.rerun()
         
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.markdown(f"#### {tenant_details['name']}")
-        with col2:
-            if st.button("← Back to List", use_container_width=True, key="back_to_tenant_list"):
-                st.session_state.view_tenant_id = None
-                st.rerun()
+        st.markdown(f"### {tenant_details['name']} - Details")
         
         # Basic info
         st.markdown("#### Basic Information")
@@ -686,7 +706,7 @@ class TenantManager:
         with action_col1:
             if st.button("Edit Tenant Details", use_container_width=True, key="edit_tenant_details"):
                 st.session_state.edit_tenant_id = tenant_id
-                st.session_state.view_tenant_id = None
+                st.session_state.management_view = 'edit'
                 st.rerun()
         
         with action_col2:
@@ -706,8 +726,7 @@ class TenantManager:
         with action_col3:
             if st.button("Add New Admin", use_container_width=True, key="add_new_admin"):
                 st.session_state.new_tenant_id = tenant_id
-                st.session_state.show_admin_form = True
-                st.session_state.view_tenant_id = None
+                st.session_state.management_view = 'admin'
                 st.rerun()
     
     def render_dashboard(self):
@@ -739,21 +758,50 @@ class TenantManager:
         
         with quick_col1:
             if st.button("➕ Create New Tenant", use_container_width=True, key="quick_create_tenant"):
-                st.session_state.edit_tenant_id = None
-                st.session_state.active_tab = 'management'  # Switch to management tab
+                st.session_state.active_tab = 'management'
+                st.session_state.management_view = 'create'
                 st.rerun()
         
         with quick_col2:
             if st.button("📊 View All Tenants", use_container_width=True, key="quick_view_tenants"):
-                st.session_state.active_tab = 'management'  # Switch to management tab
-                st.session_state.view_tenant_id = None
-                st.session_state.edit_tenant_id = None
-                st.session_state.show_admin_form = False
+                st.session_state.active_tab = 'management'
+                st.session_state.management_view = 'list'
                 st.rerun()
         
         with quick_col3:
             if st.button("🔄 Refresh Data", use_container_width=True, key="quick_refresh_data"):
                 st.rerun()
+    
+    def render_management_tab(self):
+        """Render the management tab content based on current view"""
+        if st.session_state.management_view == 'create':
+            self.render_tenant_form()
+        
+        elif st.session_state.management_view == 'edit':
+            if st.session_state.edit_tenant_id:
+                tenant_details = self.load_tenant_details(st.session_state.edit_tenant_id)
+                if tenant_details:
+                    self.render_tenant_form(tenant_details)
+                else:
+                    st.error("Tenant not found")
+                    st.session_state.management_view = 'list'
+                    st.rerun()
+            else:
+                st.session_state.management_view = 'list'
+                st.rerun()
+        
+        elif st.session_state.management_view == 'view':
+            if st.session_state.view_tenant_id:
+                self.render_tenant_detail_view(st.session_state.view_tenant_id)
+            else:
+                st.session_state.management_view = 'list'
+                st.rerun()
+        
+        elif st.session_state.management_view == 'admin':
+            self.render_admin_creation_form()
+        
+        else:  # Default to list view
+            self.render_tenant_list()
     
     def main(self):
         """Main tenant management interface"""
@@ -768,47 +816,14 @@ class TenantManager:
         st.title("🏢 Tenant Management")
         st.markdown("Comprehensive tenant account management and configuration")
         
-        # Tab navigation - use session state to control active tab
+        # Tab navigation
         tab1, tab2 = st.tabs(["📊 Dashboard", "👥 Tenant Management"])
         
-        # Determine which tab to show based on session state
-        if st.session_state.active_tab == 'dashboard':
-            with tab1:
-                self.render_dashboard()
-            with tab2:
-                # Just render empty or basic content for the other tab
-                st.info("Switch to the Dashboard tab to view tenant management dashboard.")
+        with tab1:
+            self.render_dashboard()
         
-        else:  # management tab
-            with tab1:
-                # Just render empty or basic content for the other tab
-                st.info("Switch to the Tenant Management tab to manage tenants.")
-            with tab2:
-                # Handle different view states in the management tab
-                if st.session_state.show_admin_form and st.session_state.new_tenant_id:
-                    self.render_admin_creation_form()
-                
-                elif st.session_state.edit_tenant_id:
-                    tenant_details = self.load_tenant_details(st.session_state.edit_tenant_id)
-                    if tenant_details:
-                        self.render_tenant_form(tenant_details)
-                    else:
-                        st.error("Tenant not found")
-                        st.session_state.edit_tenant_id = None
-                
-                elif st.session_state.view_tenant_id:
-                    self.render_tenant_detail_view(st.session_state.view_tenant_id)
-                
-                else:
-                    # Main management view
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown("### Tenant Management")
-                    with col2:
-                        if st.button("➕ Create New Tenant", use_container_width=True, key="main_create_tenant"):
-                            st.session_state.edit_tenant_id = None  # Ensure we're in create mode
-                    
-                    self.render_tenant_list()
+        with tab2:
+            self.render_management_tab()
 
 def tenant_manager():
     """Main entry point for the tenant manager"""
