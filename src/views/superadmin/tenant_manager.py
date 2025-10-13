@@ -1,4 +1,4 @@
-# tenant_manager.py - Refactored with enhanced robustness and superadmin features
+# tenant_manager.py - Tenant Management View for Super Admins
 import streamlit as st
 from db.database import get_db_connection
 from utils.session_guard import require_login
@@ -443,7 +443,8 @@ class TenantManager:
             submitted = st.form_submit_button(
                 f"{'Update' if is_edit else 'Create'} Tenant",
                 type="primary",
-                use_container_width=True
+                use_container_width=True,
+                key=f"submit_tenant_{'edit' if is_edit else 'new'}_{tenant_data['id'] if is_edit else 'new'}"
             )
             
             if submitted:
@@ -486,7 +487,7 @@ class TenantManager:
         
         st.markdown("### Create Tenant Administrator")
         
-        with st.form("admin_form"):
+        with st.form("admin_form", clear_on_submit=True):
             st.markdown(f"""
             <div class='admin-form'>
                 <h4>👨‍💼 Administrator Setup for {tenant_details['name']}</h4>
@@ -496,29 +497,30 @@ class TenantManager:
             
             col1, col2 = st.columns(2)
             with col1:
-                first_name = st.text_input("First Name *", placeholder="Admin's first name")
+                first_name = st.text_input("First Name *", placeholder="Admin's first name", key="admin_first_name")
             with col2:
-                last_name = st.text_input("Last Name *", placeholder="Admin's last name")
+                last_name = st.text_input("Last Name *", placeholder="Admin's last name", key="admin_last_name")
             
             col3, col4 = st.columns(2)
             with col3:
-                email = st.text_input("Email Address *", placeholder="admin@company.com")
+                email = st.text_input("Email Address *", placeholder="admin@company.com", key="admin_email")
             with col4:
-                username = st.text_input("Username *", placeholder="Choose a username")
+                username = st.text_input("Username *", placeholder="Choose a username", key="admin_username")
             
             col5, col6 = st.columns(2)
             with col5:
                 admin_submitted = st.form_submit_button(
                     "Create Admin & Send Invitation",
                     type="secondary",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="submit_admin_create"
                 )
             with col6:
-                if st.form_submit_button("Skip for Now", use_container_width=True):
-                    st.session_state.show_admin_form = False
-                    st.session_state.new_tenant_id = None
-                    st.toast("Tenant created without admin. You can add admins later.", icon="ℹ️")
-                    st.rerun()
+                skip_submitted = st.form_submit_button(
+                    "Skip for Now", 
+                    use_container_width=True,
+                    key="submit_admin_skip"
+                )
             
             if admin_submitted:
                 admin_data = {
@@ -549,6 +551,12 @@ class TenantManager:
                     st.rerun()
                 else:
                     st.error(message)
+            
+            if skip_submitted:
+                st.session_state.show_admin_form = False
+                st.session_state.new_tenant_id = None
+                st.toast("Tenant created without admin. You can add admins later.", icon="ℹ️")
+                st.rerun()
     
     def render_tenant_list(self):
         """Render the tenant directory with enhanced features"""
@@ -557,11 +565,11 @@ class TenantManager:
         # Filters
         col1, col2, col3 = st.columns([2, 2, 1])
         with col1:
-            show_inactive = st.checkbox("Show Inactive Tenants", value=False)
+            show_inactive = st.checkbox("Show Inactive Tenants", value=False, key="show_inactive_tenants")
         with col2:
-            search_term = st.text_input("Search tenants", placeholder="Search by name or industry...")
+            search_term = st.text_input("Search tenants", placeholder="Search by name or industry...", key="tenant_search")
         with col3:
-            if st.button("Refresh", use_container_width=True):
+            if st.button("Refresh", use_container_width=True, key="refresh_tenants"):
                 st.rerun()
         
         tenants = self.load_tenants(include_inactive=show_inactive)
@@ -575,10 +583,11 @@ class TenantManager:
             tenants = [t for t in tenants if search_term.lower() in t[1].lower() or 
                       search_term.lower() in (t[2] or '').lower()]
         
-        for tenant in tenants:
+        for i, tenant in enumerate(tenants):
             (tenant_id, name, industry, company_name, email, phone, 
              is_active, created_at, user_count, active_subs, total_active_subs, last_activity) = tenant
             
+            # Create a unique container for each tenant
             with st.container():
                 col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 2])
                 
@@ -605,14 +614,16 @@ class TenantManager:
                 with col5:
                     btn_col1, btn_col2, btn_col3 = st.columns(3)
                     with btn_col1:
-                        if st.button("👁️", key=f"view_{tenant_id}", help="View Details"):
+                        if st.button("👁️", key=f"view_tenant_{tenant_id}", help="View Details", use_container_width=True):
                             st.session_state.view_tenant_id = tenant_id
+                            st.rerun()
                     with btn_col2:
-                        if st.button("✏️", key=f"edit_{tenant_id}", help="Edit Tenant"):
+                        if st.button("✏️", key=f"edit_tenant_{tenant_id}", help="Edit Tenant", use_container_width=True):
                             st.session_state.edit_tenant_id = tenant_id
+                            st.rerun()
                     with btn_col3:
                         if is_active:
-                            if st.button("🚫", key=f"deactivate_{tenant_id}", help="Deactivate"):
+                            if st.button("🚫", key=f"deactivate_tenant_{tenant_id}", help="Deactivate", use_container_width=True):
                                 success, message = self.toggle_tenant_status(tenant_id, False)
                                 if success:
                                     st.toast(message, icon="✅")
@@ -620,7 +631,7 @@ class TenantManager:
                                 else:
                                     st.error(message)
                         else:
-                            if st.button("✅", key=f"activate_{tenant_id}", help="Activate"):
+                            if st.button("✅", key=f"activate_tenant_{tenant_id}", help="Activate", use_container_width=True):
                                 success, message = self.toggle_tenant_status(tenant_id, True)
                                 if success:
                                     st.toast(message, icon="✅")
@@ -643,7 +654,7 @@ class TenantManager:
         with col1:
             st.markdown(f"#### {tenant_details['name']}")
         with col2:
-            if st.button("← Back to List", use_container_width=True):
+            if st.button("← Back to List", use_container_width=True, key="back_to_tenant_list"):
                 st.session_state.view_tenant_id = None
                 st.rerun()
         
@@ -666,27 +677,27 @@ class TenantManager:
         action_col1, action_col2, action_col3 = st.columns(3)
         
         with action_col1:
-            if st.button("Edit Tenant Details", use_container_width=True):
+            if st.button("Edit Tenant Details", use_container_width=True, key="edit_tenant_details"):
                 st.session_state.edit_tenant_id = tenant_id
                 st.session_state.view_tenant_id = None
                 st.rerun()
         
         with action_col2:
             if tenant_details['is_active']:
-                if st.button("Deactivate Tenant", use_container_width=True):
+                if st.button("Deactivate Tenant", use_container_width=True, key="deactivate_tenant_action"):
                     success, message = self.toggle_tenant_status(tenant_id, False)
                     if success:
                         st.toast(message, icon="✅")
                         st.rerun()
             else:
-                if st.button("Activate Tenant", use_container_width=True):
+                if st.button("Activate Tenant", use_container_width=True, key="activate_tenant_action"):
                     success, message = self.toggle_tenant_status(tenant_id, True)
                     if success:
                         st.toast(message, icon="✅")
                         st.rerun()
         
         with action_col3:
-            if st.button("Add New Admin", use_container_width=True):
+            if st.button("Add New Admin", use_container_width=True, key="add_new_admin"):
                 st.session_state.new_tenant_id = tenant_id
                 st.session_state.show_admin_form = True
                 st.session_state.view_tenant_id = None
@@ -707,30 +718,30 @@ class TenantManager:
         total_subs = sum(t[10] for t in tenants)  # total_active_subs field
         
         with col1:
-            st.metric("Total Tenants", total_tenants)
+            st.metric("Total Tenants", total_tenants, key="metric_total_tenants")
         with col2:
-            st.metric("Active Tenants", active_tenants)
+            st.metric("Active Tenants", active_tenants, key="metric_active_tenants")
         with col3:
-            st.metric("Total Users", total_users)
+            st.metric("Total Users", total_users, key="metric_total_users")
         with col4:
-            st.metric("Active Subscriptions", total_subs)
+            st.metric("Active Subscriptions", total_subs, key="metric_active_subs")
         
         # Quick actions
         st.markdown("#### Quick Actions")
         quick_col1, quick_col2, quick_col3 = st.columns(3)
         
         with quick_col1:
-            if st.button("➕ Create New Tenant", use_container_width=True):
+            if st.button("➕ Create New Tenant", use_container_width=True, key="quick_create_tenant"):
                 st.session_state.edit_tenant_id = None
                 st.rerun()
         
         with quick_col2:
-            if st.button("📊 View All Tenants", use_container_width=True):
+            if st.button("📊 View All Tenants", use_container_width=True, key="quick_view_tenants"):
                 st.session_state.current_tab = 'manage'
                 st.rerun()
         
         with quick_col3:
-            if st.button("🔄 Refresh Data", use_container_width=True):
+            if st.button("🔄 Refresh Data", use_container_width=True, key="quick_refresh_data"):
                 st.rerun()
     
     def main(self):
@@ -774,7 +785,7 @@ class TenantManager:
                 with col1:
                     st.markdown("### Tenant Management")
                 with col2:
-                    if st.button("➕ Create New Tenant", use_container_width=True):
+                    if st.button("➕ Create New Tenant", use_container_width=True, key="main_create_tenant"):
                         st.session_state.edit_tenant_id = None  # Ensure we're in create mode
                 
                 self.render_tenant_list()
