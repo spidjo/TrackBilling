@@ -1,4 +1,4 @@
-# tenant_manager.py - Simplified and robust version
+# tenant_manager.py - Fixed datetime issue
 import streamlit as st
 from db.database import get_db_connection
 from utils.session_guard import require_login
@@ -76,6 +76,24 @@ class SimpleTenantManager:
             st.session_state.selected_tenant_id = None
         if 'new_tenant_id' not in st.session_state:
             st.session_state.new_tenant_id = None
+    
+    @staticmethod
+    def safe_strftime(date_value, format_str="%Y-%m-%d"):
+        """Safely format date whether it's string, datetime, or None"""
+        if not date_value:
+            return "Unknown"
+        try:
+            if isinstance(date_value, str):
+                # Try to parse the string to datetime
+                from dateutil.parser import parse
+                parsed_date = parse(date_value)
+                return parsed_date.strftime(format_str)
+            elif isinstance(date_value, datetime):
+                return date_value.strftime(format_str)
+            else:
+                return str(date_value)
+        except Exception:
+            return str(date_value)
     
     # Database methods (same as before, but simplified)
     @staticmethod
@@ -480,7 +498,7 @@ class SimpleTenantManager:
             st.session_state.selected_tenant_id = None
             st.rerun()
         
-        # Basic info
+        # Basic info - using safe_strftime for created_at
         col1, col2 = st.columns(2)
         
         with col1:
@@ -491,7 +509,7 @@ class SimpleTenantManager:
         with col2:
             st.metric("Contact Email", tenant_details['email'] or "Not set")
             st.metric("Phone", tenant_details['phone'] or "Not set")
-            st.metric("Created", tenant_details['created_at'].strftime("%Y-%m-%d") if tenant_details['created_at'] else "Unknown")
+            st.metric("Created", self.safe_strftime(tenant_details['created_at']))
         
         # Action buttons
         st.markdown("---")
