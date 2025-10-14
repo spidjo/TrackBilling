@@ -276,7 +276,7 @@ def usage_metric_admin():
                     """, unsafe_allow_html=True)
                     
                     st.image("https://via.placeholder.com/600x200?text=Define+Usage+Metrics+for+Better+Tracking", 
-                            use_column_width=True, caption="Define metrics to start tracking usage and billing")
+                            use_container_width=True, caption="Define metrics to start tracking usage and billing")
 
             # Tab 2: Add New Metric
             with tab2:
